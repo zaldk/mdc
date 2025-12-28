@@ -1,1 +1,1 @@
-# Material Design 3 in C
+# Material Design in C

@@ -1,9 +1,9 @@
 /*
-Single header style library for Material Design 3
+Single header style library for Material Design
 */
 
-#ifndef M3_UI
-#define M3_UI
+#ifndef MD_UI
+#define MD_UI
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,31 +22,31 @@ typedef double      f64;
 
 typedef struct {
     i32 dpi;
-} m3_ctx_t;
-static m3_ctx_t CTX = {0};
+} md_ctx_t;
+static md_ctx_t CTX = {0};
 
-void m3_ctx_set_dpi(i32 dpi);
+void md_ctx_set_dpi(i32 dpi);
 
 // UM == Useful Measurement == 10mm ≈ 0.3937007874in
-i32 m3_px2um(i32 px);
-i32 m3_um2px(i32 um);
+i32 md_px2um(i32 px);
+i32 md_um2px(i32 um);
 
 
 
 /* IMPLEMENTATION {{{ */
 
-void m3_ctx_set_dpi(i32 dpi) {
+void md_ctx_set_dpi(i32 dpi) {
     CTX.dpi = dpi;
 }
 
-i32 m3_px2um(i32 px) {
-
+i32 md_px2um(i32 px) {
+    return px;
 }
 
-i32 m3_um2px(i32 um) {
-
+i32 md_um2px(i32 um) {
+    return um;
 }
 
 /* }}} */
 
-#endif
+#endif /* MD_UI */
