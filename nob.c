@@ -28,9 +28,9 @@ int main(int argc, char **argv) {
     nob_cc(&cmd);
     cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=gnu99");
     // cmd_append(&cmd, "-Wno-unused-parameter", "-Wno-unused-variable");
-    // cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
+    cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
     cmd_append(&cmd, "-L./thirdparty/raylib-5.5_linux_amd64/lib/");
-    cmd_append(&cmd, "-o", BUILD"exe", SRC"main.c");
+    cmd_append(&cmd, "-o", BUILD"exe", SRC"demo.c");
     cmd_append(&cmd, "-lm", "-lraylib");
     if (!cmd_run(&cmd)) return 1;
 

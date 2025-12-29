@@ -5,9 +5,8 @@
 #define RL(C) (Color){(C).r,(C).g,(C).b,(C).a}
 
 void DrawColorCard(const char* text, float x, float y, float w, float h, Color bg, Color textCol) {
-    DrawRectangle(x, y, w, h, bg);
-    int textWidth = MeasureText(text, 10);
-    DrawText(text, x + (w - textWidth) / 2, y + (h - 10) / 2, 10, textCol);
+    DrawRectangleRounded((Rectangle){x, y, w, h}, 0.25, 10, bg);
+    DrawText(text, x+10, y+10, 10, textCol);
 }
 
 void DrawLayout(int t) {
@@ -73,7 +72,7 @@ void DrawLayout(int t) {
     DrawColorCard("Inverse Surface", inverse_start_x, y, w_full, h, RL(COLOR.Scheme.InverseSurface[t]), RL(COLOR.Scheme.InverseOnSurface[t]));
 
     y += h + gap; x = start_x;
-    float w_container = ((w_full * 3 + gap * 2) / 5.0f);
+    float w_container = (w_full * 3 + gap * 2) / 5.0f - gap;
     DrawColorCard("Surface\nC. Lowest", x, y, w_container, h, RL(COLOR.Scheme.SurfaceContainerLowest[t]), RL(COLOR.Scheme.OnSurface[t])); x += w_container + gap;
     DrawColorCard("Surface\nC. Low", x, y, w_container, h, RL(COLOR.Scheme.SurfaceContainerLow[t]), RL(COLOR.Scheme.OnSurface[t])); x += w_container + gap;
     DrawColorCard("Surface\nContainer", x, y, w_container, h, RL(COLOR.Scheme.SurfaceContainer[t]), RL(COLOR.Scheme.OnSurface[t])); x += w_container + gap;
@@ -83,24 +82,23 @@ void DrawLayout(int t) {
     DrawColorCard("Inverse On Surface", inverse_start_x, y, w_full, h, RL(COLOR.Scheme.InverseOnSurface[t]), RL(COLOR.Scheme.InverseSurface[t]));
 
     y += h + gap; x = start_x;
-    DrawColorCard("On Surface", x, y, w_full, h, RL(COLOR.Scheme.OnSurface[t]), RL(COLOR.Scheme.Surface[t])); x += w_full + gap;
-    DrawColorCard("On Surface Variant", x, y, w_full, h, RL(COLOR.Scheme.OnSurfaceVariant[t]), RL(COLOR.Scheme.Surface[t]));
+    w_container = (w_full * 3 + gap * 2) / 4.0f - gap;
+    DrawColorCard("On Surface", x, y, w_container, h, RL(COLOR.Scheme.OnSurface[t]), RL(COLOR.Scheme.Surface[t])); x += w_container + gap;
+    DrawColorCard("On Surface\nVariant", x, y, w_container, h, RL(COLOR.Scheme.OnSurfaceVariant[t]), RL(COLOR.Scheme.Surface[t])); x += w_container + gap;
+    DrawColorCard("Outline", x, y, w_container, h, RL(COLOR.Scheme.Outline[t]), RL(COLOR.Scheme.OnSurface[t])); x += w_container + gap;
+    DrawColorCard("Outline\nVariant", x, y, w_container, h, RL(COLOR.Scheme.OutlineVariant[t]), RL(COLOR.Scheme.OnSurface[t]));
 
     DrawColorCard("Inverse Primary", inverse_start_x, y, w_full, h, RL(COLOR.Scheme.InversePrimary[t]), RL(COLOR.Scheme.OnPrimaryContainer[t]));
-
-    y += h + gap; x = start_x;
-    DrawColorCard("Outline", x, y, w_full, h, RL(COLOR.Scheme.Outline[t]), RL(COLOR.Scheme.OnSurface[t])); x += w_full + gap;
-    DrawColorCard("Outline Variant", x, y, w_full, h, RL(COLOR.Scheme.OutlineVariant[t]), RL(COLOR.Scheme.OnSurface[t]));
 }
 
 int main(void) {
     md_init_global_color();
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN);
-    InitWindow(800, 600, "FLOAT");
+    InitWindow(600, 500, "FLOAT");
     SetTargetFPS(500);
 
-    int themeIndex = 1;
+    int themeIndex = 0;
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) themeIndex = !themeIndex;
 
@@ -113,7 +111,7 @@ int main(void) {
         ClearBackground(RL(COLOR.Scheme.Background[themeIndex]));
         DrawLayout(themeIndex);
 
-        DrawText("Press 'Space' To Change Theme", 10, 570, 20, RL(COLOR.Scheme.OnBackground[themeIndex]));
+        DrawText("Press 'Space' To Change Theme", 10, 470, 20, RL(COLOR.Scheme.OnBackground[themeIndex]));
 
         // DrawFPS(0,0);
         EndDrawing();
