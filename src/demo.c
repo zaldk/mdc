@@ -85,7 +85,7 @@ void DrawLayout(int t) {
     w_container = (w_full * 3 + gap * 2) / 4.0f - gap;
     DrawColorCard("On Surface", x, y, w_container, h, RL(COLOR.Scheme.OnSurface[t]), RL(COLOR.Scheme.Surface[t])); x += w_container + gap;
     DrawColorCard("On Surface\nVariant", x, y, w_container, h, RL(COLOR.Scheme.OnSurfaceVariant[t]), RL(COLOR.Scheme.Surface[t])); x += w_container + gap;
-    DrawColorCard("Outline", x, y, w_container, h, RL(COLOR.Scheme.Outline[t]), RL(COLOR.Scheme.OnSurface[t])); x += w_container + gap;
+    DrawColorCard("Outline", x, y, w_container, h, RL(COLOR.Scheme.Outline[t]), RL(COLOR.Scheme.Surface[t])); x += w_container + gap;
     DrawColorCard("Outline\nVariant", x, y, w_container, h, RL(COLOR.Scheme.OutlineVariant[t]), RL(COLOR.Scheme.OnSurface[t]));
 
     DrawColorCard("Inverse Primary", inverse_start_x, y, w_full, h, RL(COLOR.Scheme.InversePrimary[t]), RL(COLOR.Scheme.OnPrimaryContainer[t]));
