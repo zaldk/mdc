@@ -113,6 +113,8 @@ int main(void) {
         ClearBackground(RL(COLOR.Scheme.Background[themeIndex]));
         DrawLayout(themeIndex);
 
+        DrawText("Press 'Space' To Change Theme", 10, 570, 20, RL(COLOR.Scheme.OnBackground[themeIndex]));
+
         // DrawFPS(0,0);
         EndDrawing();
     }
