@@ -25,7 +25,7 @@ typedef float       f32;
 typedef double      f64;
 
 typedef struct { f32 x, y; } vec2;
-typedef struct { f32 x, y, z; } vec3;
+typedef struct { f32 x, y, w, h; } rect;
 
 #include "colors_material_palettes.h"
 #include "colors_material_schemes.h"
@@ -96,14 +96,14 @@ static struct {
         color_t SurfaceTint[2];
         color_t Outline[2];
         color_t OutlineVariant[2];
-        color_t Background[2];
-        color_t OnBackground[2];
         color_t SurfaceBright[2];
         color_t SurfaceDim[2];
+        color_t Background[2];
+        color_t OnBackground[2];
     } Scheme; // [0] == Dark; [1] == Light
 } COLOR = {0}; // Global Color Lookup
 
-void md_init_global_color(void);
+void md_init_global_color(bool interpolate);
 
 typedef struct {
     vec2 scaling_factor; // global scaling of the window manager
@@ -162,15 +162,16 @@ void _fill_in_gaps(color_t* colors) {
     }
 }
 
-void md_init_global_color(void) {
-    static color_t colors[101] = {0};
+void md_init_global_color(bool interpolate) {
+    static color_t colors[101];
+    memset(colors, 0, sizeof(color_t)*101);
     colors[0] = (color_t){0,0,0,0xFF};
     colors[100] = (color_t){0xFF,0xFF,0xFF,0xFF};
 
     // Baseline
     #define Y(NAME, Name) \
         COMBINE(MATERIAL_PALETTE_BASELINE_, NAME); \
-        _fill_in_gaps(colors); \
+        if (interpolate) _fill_in_gaps(colors); \
         for (u8 i = 0; i < 101; i++) ACCESS(Baseline,Name)[i] = colors[i]; \
         memset(&colors[1], 0, sizeof(color_t)*99);
 
@@ -186,7 +187,7 @@ void md_init_global_color(void) {
     // Static
     #define Y(NAME, Name) \
         COMBINE(MATERIAL_PALETTE_STATIC_, NAME); \
-        _fill_in_gaps(colors); \
+        if (interpolate) _fill_in_gaps(colors); \
         for (u8 i = 0; i < 101; i++) ACCESS(Static,Name)[i] = colors[i]; \
         memset(&colors[1], 0, sizeof(color_t)*99);
 
@@ -199,12 +200,13 @@ void md_init_global_color(void) {
     #undef X
     #undef Y
 
-
+    // Dark Scheme
     #define X(SchemeName, BaselineName, BaselineVariant) \
         COLOR.Scheme.SchemeName[0] = COLOR.Baseline.BaselineName[BaselineVariant];
     MATERIAL_SCHEME_DARK
     #undef X
 
+    // Light Scheme
     #define X(SchemeName, BaselineName, BaselineVariant) \
         COLOR.Scheme.SchemeName[1] = COLOR.Baseline.BaselineName[BaselineVariant];
     MATERIAL_SCHEME_LIGHT

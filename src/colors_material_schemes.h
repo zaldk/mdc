@@ -36,15 +36,15 @@
     X(SurfaceContainerHigh,    Neutral,   17) \
     X(SurfaceContainer,        Neutral,   12) \
     X(SurfaceContainerLow,     Neutral,   10) \
-    X(SurfaceContainerLowest,  Neutral,    4) \
+    X(SurfaceContainerLowest,  Neutral,    6) \
     X(InverseSurface,          Neutral,   90) \
     X(InverseOnSurface,        Neutral,   20) \
     X(Outline,                 Neutral,   60) \
     X(OutlineVariant,          Neutral,   30) \
-    X(Background,              Neutral,    6) \
-    X(OnBackground,            Neutral,   90) \
     X(SurfaceBright,           Neutral,   24) \
-    X(SurfaceDim,              Neutral,    6)
+    X(SurfaceDim,              Neutral,    6) \
+    X(Background,              Neutral,    6) \
+    X(OnBackground,            Neutral,   90)
 
 #define MATERIAL_SCHEME_LIGHT \
     X(Primary,                 Primary,   40) \
@@ -80,16 +80,33 @@
     X(OnSurface,               Neutral,   10) \
     X(SurfaceVariant,          Neutral,   90) \
     X(OnSurfaceVariant,        Neutral,   30) \
-    X(SurfaceContainerHighest, Neutral,   90) \
-    X(SurfaceContainerHigh,    Neutral,   92) \
+    X(SurfaceContainerHighest, Neutral,   98) \
+    X(SurfaceContainerHigh,    Neutral,   96) \
     X(SurfaceContainer,        Neutral,   94) \
-    X(SurfaceContainerLow,     Neutral,   96) \
-    X(SurfaceContainerLowest,  Neutral,  100) \
+    X(SurfaceContainerLow,     Neutral,   92) \
+    X(SurfaceContainerLowest,  Neutral,   90) \
     X(InverseSurface,          Neutral,   20) \
     X(InverseOnSurface,        Neutral,   95) \
     X(Outline,                 Neutral,   50) \
     X(OutlineVariant,          Neutral,   80) \
-    X(Background,              Neutral,   98) \
-    X(OnBackground,            Neutral,   10) \
     X(SurfaceBright,           Neutral,   98) \
-    X(SurfaceDim,              Neutral,   87)
+    X(SurfaceDim,              Neutral,   87) \
+    X(Background,              Neutral,   98) \
+    X(OnBackground,            Neutral,   10)
+
+/* CHANGES:
+I changed the light theme's surface containers to match:
+    lowest  = darkest
+    highest = brightest
+        SurfaceContainerHighest  90 <- 98
+        SurfaceContainerHigh     92 <- 96
+        SurfaceContainer         94 <- 94
+        SurfaceContainerLow      96 <- 92
+        SurfaceContainerLowest  100 <- 90
+
+And i changed:
+    Dark  Lowest  == Dark  Surface
+    Light Highest == Light Surface
+        SurfaceContainerHighest 100 <- 98
+        SurfaceContainerLowest 4 <- 6
+*/

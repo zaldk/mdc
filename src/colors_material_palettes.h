@@ -2,17 +2,17 @@
     Y(Baseline, Primary,    0) \
     Y(Baseline, Secondary,  1) \
     Y(Baseline, Tertiary,   2) \
-    Y(Baseline, Neutral,    3) \
-    Y(Baseline, Error,      4) \
-    Y(Static,   Blue,       5) \
-    Y(Static,   Yellow,     6) \
+    Y(Baseline, Error,      3) \
+    Y(Baseline, Neutral,    4) \
+    Y(Static,   Grey,       5) \
+    Y(Static,   Pink,       6) \
     Y(Static,   Red,        7) \
-    Y(Static,   Purple,     8) \
-    Y(Static,   Cyan,       9) \
-    Y(Static,   Grey,      10) \
-    Y(Static,   Green,     11) \
-    Y(Static,   Orange,    12) \
-    Y(Static,   Pink,      13)
+    Y(Static,   Orange,     8) \
+    Y(Static,   Yellow,     9) \
+    Y(Static,   Green,     10) \
+    Y(Static,   Cyan,      11) \
+    Y(Static,   Blue,      12) \
+    Y(Static,   Purple,    13)
 
 #define COLOR_LABELS_BASELINE \
     Y(PRIMARY,   Primary) \
@@ -34,6 +34,84 @@
 
 
 
+/* from https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/material3/material3/src/commonMain/kotlin/androidx/compose/material3/tokens/PaletteTokens.kt */
+
+#define MATERIAL_PALETTE_BASELINE_ERROR \
+    X(Error, 10, 65, 14, 11) \
+    X(Error, 20, 96, 20, 16) \
+    X(Error, 30, 140, 29, 24) \
+    X(Error, 40, 179, 38, 30) \
+    X(Error, 50, 220, 54, 46) \
+    X(Error, 60, 228, 105, 98) \
+    X(Error, 70, 236, 146, 142) \
+    X(Error, 80, 242, 184, 181) \
+    X(Error, 90, 249, 222, 220) \
+    X(Error, 95, 252, 238, 238) \
+    X(Error, 99, 255, 251, 249)
+
+#define MATERIAL_PALETTE_BASELINE_NEUTRAL \
+    X(Neutral, 4,  15, 13, 19) \
+    X(Neutral, 6,  20, 18, 24) \
+    X(Neutral, 10, 29, 27, 32) \
+    X(Neutral, 12, 33, 31, 38) \
+    X(Neutral, 17, 43, 41, 48) \
+    X(Neutral, 20, 50, 47, 53) \
+    X(Neutral, 22, 54, 52, 59) \
+    X(Neutral, 24, 59, 56, 62) \
+    X(Neutral, 30, 72, 70, 76) \
+    X(Neutral, 40, 96, 93, 100) \
+    X(Neutral, 50, 121, 118, 125) \
+    X(Neutral, 60, 147, 143, 150) \
+    X(Neutral, 70, 174, 169, 177) \
+    X(Neutral, 80, 202, 197, 205) \
+    X(Neutral, 87, 222, 216, 225) \
+    X(Neutral, 90, 230, 224, 233) \
+    X(Neutral, 92, 236, 230, 240) \
+    X(Neutral, 94, 243, 237, 247) \
+    X(Neutral, 95, 245, 239, 247) \
+    X(Neutral, 96, 247, 242, 250) \
+    X(Neutral, 98, 254, 247, 255) \
+    X(Neutral, 99, 255, 251, 255)
+
+#define MATERIAL_PALETTE_BASELINE_PRIMARY \
+    X(Primary, 10, 33, 0, 93) \
+    X(Primary, 20, 56, 30, 114) \
+    X(Primary, 30, 79, 55, 139) \
+    X(Primary, 40, 103, 80, 164) \
+    X(Primary, 50, 127, 103, 190) \
+    X(Primary, 60, 154, 130, 219) \
+    X(Primary, 70, 182, 157, 248) \
+    X(Primary, 80, 208, 188, 255) \
+    X(Primary, 90, 234, 221, 255) \
+    X(Primary, 95, 246, 237, 255) \
+    X(Primary, 99, 255, 251, 254)
+
+#define MATERIAL_PALETTE_BASELINE_SECONDARY \
+    X(Secondary, 10, 29, 25, 43) \
+    X(Secondary, 20, 51, 45, 65) \
+    X(Secondary, 30, 74, 68, 88) \
+    X(Secondary, 40, 98, 91, 113) \
+    X(Secondary, 50, 122, 114, 137) \
+    X(Secondary, 60, 149, 141, 165) \
+    X(Secondary, 70, 176, 167, 192) \
+    X(Secondary, 80, 204, 194, 220) \
+    X(Secondary, 90, 232, 222, 248) \
+    X(Secondary, 95, 246, 237, 255) \
+    X(Secondary, 99, 255, 251, 254)
+
+#define MATERIAL_PALETTE_BASELINE_TERTIARY \
+    X(Tertiary, 10, 49, 17, 29) \
+    X(Tertiary, 20, 73, 37, 50) \
+    X(Tertiary, 30, 99, 59, 72) \
+    X(Tertiary, 40, 125, 82, 96) \
+    X(Tertiary, 50, 152, 105, 119) \
+    X(Tertiary, 60, 181, 131, 146) \
+    X(Tertiary, 70, 210, 157, 172) \
+    X(Tertiary, 80, 239, 184, 200) \
+    X(Tertiary, 90, 255, 216, 228) \
+    X(Tertiary, 95, 255, 236, 241) \
+    X(Tertiary, 99, 255, 251, 250)
+/*
 #define MATERIAL_PALETTE_BASELINE_PRIMARY \
     X(Primary,   10, 0x21, 0x00, 0x5D) \
     X(Primary,   20, 0x38, 0x1E, 0x72) \
@@ -109,6 +187,7 @@
     X(Error,     90, 0xF9, 0xDE, 0xDC) \
     X(Error,     95, 0xFC, 0xEE, 0xEE) \
     X(Error,     99, 0xFF, 0xFB, 0xF9)
+*/
 
 
 

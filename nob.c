@@ -25,20 +25,36 @@ int main(int argc, char **argv) {
         if (!cmd_run(&cmd, .stdout_path = BUILD".gitignore")) return 1;
     }
 
-    nob_cc(&cmd);
-    cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=gnu99");
-    // cmd_append(&cmd, "-Wno-unused-parameter", "-Wno-unused-variable");
-    cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
-    cmd_append(&cmd, "-L./thirdparty/raylib-5.5_linux_amd64/lib/");
-    cmd_append(&cmd, "-o", BUILD"exe", SRC"demo.c");
-    cmd_append(&cmd, "-lm", "-lraylib");
-    if (!cmd_run(&cmd)) return 1;
+    char* nob_name = shift(argv, argc);
+    if (argc == 0) {
+        nob_log(NOB_INFO, "USAGE: %s N r?\n\tN - Number of the demo to build\n\tr - optional flag to run the built demo", nob_name);
+        nob_log(NOB_INFO, "Available demos:\n\t1 - color schemes\n\t2 - all colors\n\t3 - components (wip)");
+        return 0;
+    }
 
-    shift(argv, argc);
-    if (argc > 0) {
-        char* arg = shift(argv, argc);
-        if (arg != NULL && arg[0] == 'r') {
-            cmd_append(&cmd, BUILD"exe");
+    char* arg_demo = shift(argv, argc);
+
+    if (arg_demo != NULL && arg_demo[0] >= '1' && arg_demo[0] <= '9') {
+        char build_here[64] = {0};
+        snprintf((char*)build_here, 64, BUILD"demo-%c.exe", arg_demo[0]);
+        char* source_here[64] = {0};
+        snprintf((char*)source_here, 64, SRC"demo-%c.c", arg_demo[0]);
+
+        nob_cc(&cmd);
+        cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=gnu99");
+        // cmd_append(&cmd, "-Wno-unused-parameter", "-Wno-unused-variable");
+        cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
+        cmd_append(&cmd, "-L./thirdparty/raylib-5.5_linux_amd64/lib/");
+        cmd_append(&cmd, "-o", (char*)build_here, (char*)source_here);
+        cmd_append(&cmd, "-lm", "-lraylib");
+        if (!cmd_run(&cmd)) return 1;
+
+        nob_log(NOB_INFO, "Built Demo %c", arg_demo[0]);
+        if (argc == 0) return 0;
+
+        char* arg_run = shift(argv, argc);
+        if (arg_run != NULL && arg_run[0] == 'r') {
+            cmd_append(&cmd, build_here);
             if (!cmd_run(&cmd)) return 1;
         }
     }

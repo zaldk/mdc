@@ -4,11 +4,17 @@
 
 ```sh
 cc -o nob nob.c
-./nob r
+./nob
 ```
 
 ## Demo Layout
 
-![Dark Theme](images/demo_layout_dark.png)
+| Dark Scheme | Light Scheme |
+|-------------|--------------|
+| ![Dark Theme](images/demo_1_layout_dark.png) | ![Light Theme](images/demo_1_layout_light.png) |
 
-![Light Theme](images/demo_layout_light.png)
+---
+
+| All Colors (Interpolated) | Provided Colors |
+|-------------|--------------|
+| ![Dark Theme](images/demo_2_all_colors_interpolated.png) | ![Light Theme](images/demo_2_all_colors_raw.png) |
