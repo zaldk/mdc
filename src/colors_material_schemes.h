@@ -1,3 +1,20 @@
+/* CHANGES:
+I changed the light theme's surface containers to match:
+    lowest  = darkest
+    highest = brightest
+        SurfaceContainerHighest  90 <- 98
+        SurfaceContainerHigh     92 <- 96
+        SurfaceContainer         94 <- 94
+        SurfaceContainerLow      96 <- 92
+        SurfaceContainerLowest  100 <- 90
+
+And i changed:
+    Dark  Lowest  == Dark  Surface
+    Light Highest == Light Surface
+        SurfaceContainerHighest 100 <- 98
+        SurfaceContainerLowest 4 <- 6
+*/
+
 #define MATERIAL_SCHEME_DARK \
     X(Primary,                 Primary,   80) \
     X(OnPrimary,               Primary,   20) \
@@ -93,20 +110,3 @@
     X(SurfaceDim,              Neutral,   87) \
     X(Background,              Neutral,   98) \
     X(OnBackground,            Neutral,   10)
-
-/* CHANGES:
-I changed the light theme's surface containers to match:
-    lowest  = darkest
-    highest = brightest
-        SurfaceContainerHighest  90 <- 98
-        SurfaceContainerHigh     92 <- 96
-        SurfaceContainer         94 <- 94
-        SurfaceContainerLow      96 <- 92
-        SurfaceContainerLowest  100 <- 90
-
-And i changed:
-    Dark  Lowest  == Dark  Surface
-    Light Highest == Light Surface
-        SurfaceContainerHighest 100 <- 98
-        SurfaceContainerLowest 4 <- 6
-*/
