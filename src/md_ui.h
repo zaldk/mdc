@@ -24,7 +24,12 @@ typedef intptr_t  isize;
 typedef float       f32;
 typedef double      f64;
 
+#define ABS(x) ((x)>=0?(x):-(x))
+#define MAX(a,b) ((a)>=(b)?(a):(b))
+#define MIN(a,b) ((a)<=(b)?(a):(b))
 #define MD_ENUM(type, name) typedef type name; enum
+
+#define UNUSED(X) ((void)X)
 
 #include <stdio.h>
 #define MD_PRINTF printf
@@ -231,6 +236,8 @@ typedef struct {
 // When some info is omitted, the functions will fill it in and return the object back.
 md_button_t md_button(md_button_t button);
 md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button);
+bool md_render_button(md_button_t button);
+bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button);
 
 
 
@@ -262,6 +269,8 @@ bool md_ctx_append_command_ctx(md_ctx_t* ctx, md_command_t cmd) {
 
 md_button_t md_button(md_button_t button) { return md_button_ctx(&CTX, button); }
 md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button) {
+    UNUSED(ctx);
+    // {{{
     u8 shadow_amount = 0;
     f32 state_layer = 0; // background shape, with foreground color, with opacity=state_layer
 
@@ -397,6 +406,15 @@ md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button) {
 
     button.state_layer = state_layer;
     return button;
+    // }}}
+}
+
+bool md_render_button(md_button_t button) { return md_render_button_ctx(&CTX, button); }
+bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button) {
+    UNUSED(ctx);
+    UNUSED(button);
+    // md_ctx_append_command_ctx(ctx, cmd);
+    return true;
 }
 
 f32 md_px2mm(i32 px) { return md_px2mm_ctx(&CTX, px); }

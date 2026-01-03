@@ -3,7 +3,6 @@
 #include "md_ui.h"
 #include <assert.h>
 #include <stdlib.h>
-#include <time.h>
 
 #define RL(C) (Color){(C).r,(C).g,(C).b,(C).a}
 #define RL1(C) (Color){(C).r,(C).g,(C).b,51}
@@ -19,7 +18,6 @@ void DrawTextCentered(const char* text, f32 size, int x, int y, int w, int h, co
 }
 
 void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr, color_t bg) {
-    UNUSED(bg);
     /* Normal
         /--+---+--\
        / 1 | 5 | 2 \
@@ -72,6 +70,45 @@ void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr
     if (w9 > 0 && h9 > 0) DrawRectangleRec((Rectangle){x9,y9,w9,h9}, RL(COLOR.Purple[60]));
 }
 
+void DrawLayout() {
+    // {{{
+    for (u8 state = 0; state < 5; state++) {
+        for (u8 style = 0; style < 5; style++) {
+            u8 x = state;
+            u8 y = style;
+            DrawTextEx(roboto, TextFormat("%d", x+1),   (Vector2){100+x*150-10,  50+y*150-20}, 20, 0, RL(COLOR.Scheme.OnBackground));
+            DrawTextEx(roboto, TextFormat("%c", y+'A'), (Vector2){ 50+x*150-15, 100+y*150-10}, 20, 0, RL(COLOR.Scheme.OnBackground));
+
+            {
+                md_button_t input = {0}; input.state = state; input.style = style; input.type = 0;
+                md_button_t output = md_button(input);
+                DrawRectangle(50+x*150, 50+y*150, 100,25, RL(output.bg));
+                DrawRectangle(50+x*150, 50+y*150, 100,25, RL2(output.fg, output.state_layer));
+                DrawTextCentered("Default", 15, 75+x*150, 56+y*150, 50,12, output.fg);
+            }
+            if (style < 4) {
+                md_button_t input = {0}; input.state = state; input.style = style; input.type = 1; input.toggle = 0;
+                md_button_t output = md_button(input);
+                DrawRectangle(50+x*150, 50+y*150+37, 100,25, RL(output.bg));
+                DrawRectangle(50+x*150, 50+y*150+37, 100,25, RL2(output.fg, output.state_layer));
+                DrawTextCentered("Selected", 15, 75+x*150, 56+y*150+37, 50,12, output.fg);
+            }
+            if (style < 4) {
+                md_button_t input = {0}; input.state = state; input.style = style; input.type = 1; input.toggle = 1;
+                md_button_t output = md_button(input);
+                DrawRectangle(50+x*150, 50+y*150+75, 100,25, RL(output.bg));
+                DrawRectangle(50+x*150, 50+y*150+75, 100,25, RL2(output.fg, output.state_layer));
+                DrawTextCentered("Unselected", 15, 75+x*150, 56+y*150+75, 50,12, output.fg);
+            }
+        }
+    }
+
+    DrawTextEx(roboto, "Button Reference", (Vector2){5, 0}, 20.0, 0.0, RL(COLOR.Scheme.OnBackground));
+    DrawTextEx(roboto, "Styles: A=Elevated B=Filled C=Tonal D=Outline E=Text", (Vector2){5, 740}, 20.0, 0.0, RL(COLOR.Scheme.OnBackground));
+    DrawTextEx(roboto, "States: 1=Default 2=Disabled 3=Hovered 4=Focused 5=Pressed", (Vector2){5, 760}, 20.0, 0.0, RL(COLOR.Scheme.OnBackground));
+    // }}}
+}
+
 #define R(N) (rand()%(N))
 
 int main(void) {
@@ -86,18 +123,19 @@ int main(void) {
     SetTextureFilter(roboto.texture, TEXTURE_FILTER_TRILINEAR);
 
 
-    time_t seed = time(NULL);
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) md_color_global_switch_theme();
         BeginDrawing();
         ClearBackground(RL(COLOR.Scheme.Background));
 
-        srand(seed);
-        for (int y = 0; y < 800; y += 200) {
-            for (int x = 0; x < 800; x += 200) {
-                DrawBoxRound(x+25,y+25,150,150, R(75),R(75),R(75),R(75), COLOR.Scheme.OnBackground);
-            }
-        }
+        // srand(0);
+        // for (int y = 0; y < 800; y += 200) {
+        //     for (int x = 0; x < 800; x += 200) {
+        //         DrawBoxRound(x+25,y+25,150,150, R(75),R(75),R(75),R(75), COLOR.Scheme.OnBackground);
+        //     }
+        // }
+
+        DrawLayout();
 
         DrawTextEx(roboto, "Press 'Space' To Change Theme", (Vector2){5, 780}, 20.0, 0.0, RL(COLOR.Scheme.OnBackground));
         EndDrawing();
