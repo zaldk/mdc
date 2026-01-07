@@ -1,0 +1,12 @@
+Diagnostics:
+  Suppress:
+    - bool_redeclaration
+    - macro-redefined
+    - misc-definitions-in-headers
+    - writable-strings
+Index:
+  StandardLibrary: No
+SemanticTokens:
+  DisabledKinds: [InactiveCode]
+CompileFlags:
+  Add: [-DMD_UI_IMPLEMENTATION]

@@ -3,13 +3,14 @@ Single header style library for Material Design
 All measurements are in mm, unless stated otherwise.
 */
 
-#ifndef MD_UI
+#ifndef MD_UI /* {{{ */
 #define MD_UI
 
 #include <math.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
 
 typedef uint8_t      u8;
 typedef uint16_t    u16;
@@ -30,6 +31,7 @@ typedef double      f64;
 #define MD_ENUM(type, name) typedef type name; enum
 
 #define UNUSED(X) ((void)X)
+#define UNREACHABLE(S) assert(0 && (#S))
 
 #include <stdio.h>
 #define MD_PRINTF printf
@@ -59,9 +61,12 @@ typedef double      f64;
 #include "colors_material_palettes.h"
 #include "colors_material_schemes.h"
 
-typedef struct {
-    u8 r, g, b, a;
-} color_t;
+#if defined(RAYLIB_H)
+    typedef Color color_t;
+#else
+    typedef struct { u8 r, g, b, a; } color_t;
+#endif
+
 #define COLOR_INVALID (color_t){0xFF,0,0xFF,0xFF}
 #define COLOR_UNSET(C) ((C).r == 0 && (C).g == 0 && (C).b == 0 && (C).a == 0)
 #define COLOR_EQ(A,B) ((A).r == (B).r && (A).g == (B).g && (A).b == (B).b && (A).a == (B).a)
@@ -127,36 +132,32 @@ void md_color_global_init(bool interpolate);
 void md_color_global_set_theme(u8 theme);
 void md_color_global_switch_theme();
 
-typedef struct {
-    f32 x, y;
-} vec2;
-
-typedef struct {
-    f32 x, y, w, h;
-} box_t;
+#if defined(RAYLIB_H)
+    typedef Vector2 vec2;
+#else
+    typedef struct { f32 x, y; } vec2;
+#endif
+typedef struct { f32 x, y, w, h; } box_t;
 
 MD_ENUM(u8, md_align_t) {
     MD_ALIGN_START,
     MD_ALIGN_CENTER,
     MD_ALIGN_END,
 };
-typedef struct {
-    md_align_t x, y;
-} md_text_align_t;
+typedef struct { md_align_t x, y; } md_text_align_t;
 
-typedef struct {
-    f32 tl, tr, br, bl;
-} md_corners_t;
-static const f32 MD_ROUND_NONE     =    0;
-static const f32 MD_ROUND_SMALLEST =    1;
-static const f32 MD_ROUND_SMALL    =    2;
-static const f32 MD_ROUND_MEDIUM   =    5;
-static const f32 MD_ROUND_LARGE    =   10;
-static const f32 MD_ROUND_LARGEST  =   20;
-static const f32 MD_ROUND_FULL     = 9999;
+typedef struct { f32 tl, tr, bl, br; } md_corners_t;
+static const f32 MD_ROUND_NONE     =   0;
+static const f32 MD_ROUND_SMALLEST =   1;
+static const f32 MD_ROUND_SMALL    =   2;
+static const f32 MD_ROUND_MEDIUM   =   5;
+static const f32 MD_ROUND_LARGE    =  10;
+static const f32 MD_ROUND_LARGEST  =  20;
+static const f32 MD_ROUND_FULL     = 100;
 
 #define MD_COMMANDS_MAXIMUM_QUANTITY 1024
 typedef u8 md_command_type_t; enum {
+    MD_COMMAND_DRAW_NONE,
     MD_COMMAND_DRAW_BOX,
     MD_COMMAND_DRAW_TEXT,
 };
@@ -167,24 +168,38 @@ typedef struct {
             box_t box;
             color_t color;
             md_corners_t round;
-        } draw_box;
-    } cmd;
+        } box;
+        struct {
+            box_t box; // width and height are for scissor mode, ignored if 0
+            char* text;
+            color_t color;
+            f32 font_size;
+        } text;
+    } as;
 } md_command_t;
+
+typedef vec2 (*md_measure_text_fn)(char* text, f32 font_size);
 
 typedef struct {
     vec2 scaling_factor; // global scaling of the window manager
     vec2 monitor_size; // physical size, in mm
     vec2 monitor_resolution; // width and height, in pixels
 
+    md_measure_text_fn measure_text; // required
+    f32 font_size;
+
     md_command_t* cmd_list; // must be at least MD_COMMANDS_MAXIMUM_QUANTITY
     u32 cmd_list_len;
+    u32 cmd_list_poll_index;
 } md_ctx_t;
 static md_ctx_t CTX = {0};
 
-void md_ctx_init(vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory);
-void md_ctx_init_ctx(md_ctx_t* ctx, vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory);
-bool md_ctx_append_command(md_command_t cmd);
-bool md_ctx_append_command_ctx(md_ctx_t* ctx, md_command_t cmd);
+void md_ctx_init(vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn);
+void md_ctx_init_ctx(md_ctx_t* ctx, vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn);
+bool md_ctx_append(md_command_t cmd);
+bool md_ctx_append_ctx(md_ctx_t* ctx, md_command_t cmd);
+bool md_ctx_poll(md_command_t* cmd);
+bool md_ctx_poll_ctx(md_ctx_t* ctx, md_command_t* cmd);
 
 f32 md_px2mm(i32 px);
 f32 md_px2mm_ctx(md_ctx_t* ctx, i32 px);
@@ -193,21 +208,18 @@ i32 md_mm2px_ctx(md_ctx_t* ctx, f32 mm);
 
 /* https://m3.material.io/components/buttons/overview */
 MD_ENUM(u8, md_button_state_t) {
-    MD_BUTTON_STATE_DEFAULT,
+    MD_BUTTON_STATE_ENABLED,
     MD_BUTTON_STATE_DISABLED,
     MD_BUTTON_STATE_HOVERED,
     MD_BUTTON_STATE_FOCUSED,
     MD_BUTTON_STATE_PRESSED,
 };
-MD_ENUM(u8, md_button_toggle_t) {
-    MD_BUTTON_TOGGLE_SELECTED,   // only for TOGGLE type
-    MD_BUTTON_TOGGLE_UNSELECTED, // only for TOGGLE type
-};
 MD_ENUM(u8, md_button_type_t) {
-    MD_BUTTON_TYPE_DEFAULT, // button auto resets to default state after press
-    MD_BUTTON_TYPE_TOGGLE,  // button does not auto reset to default state after press
+    MD_BUTTON_TYPE_DEFAULT,    // normal
+    MD_BUTTON_TYPE_UNSELECTED, // toggle - off
+    MD_BUTTON_TYPE_SELECTED,   // toggle - on
 };
-MD_ENUM(u8, md_button_style_t) {
+MD_ENUM(u8, md_button_design_t) {
     MD_BUTTON_DESIGN_ELEVATED,
     MD_BUTTON_DESIGN_FILLED,
     MD_BUTTON_DESIGN_TONAL,
@@ -219,16 +231,15 @@ typedef struct {
     box_t box;          // X,Y - required; W,H - optional;
     md_corners_t round; // required
     color_t bg;         // optional
-    f32 state_layer;
+    u8 state_layer, elevation;
 
-    const char* text;           // required
+    char* text;                 // required
     md_text_align_t text_align; // optional
     color_t fg;                 // optional
 
     md_button_type_t type;     // required
     md_button_state_t state;   // optional
-    md_button_toggle_t toggle; // optional
-    md_button_style_t style;   // optional
+    md_button_design_t design; // optional
 
     md_callback_button cb;     // optional
 } md_button_t;
@@ -239,173 +250,199 @@ md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button);
 bool md_render_button(md_button_t button);
 bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button);
 
+#endif /* MD_UI }}} */
 
 
-/* IMPLEMENTATION {{{ */
 
-void md_ctx_init(vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory) {
-    md_ctx_init_ctx(&CTX, scaling_factor, monitor_size, monitor_resolution, cmd_list_memory);
+#ifdef MD_UI_IMPLEMENTATION /* {{{ */
+
+void md_ctx_init(vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn) {
+    md_ctx_init_ctx(&CTX, scaling_factor, monitor_size, monitor_resolution, cmd_list_memory, fn);
 }
-void md_ctx_init_ctx(md_ctx_t* ctx, vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory) {
+void md_ctx_init_ctx(md_ctx_t* ctx, vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn) {
     ctx->scaling_factor     = scaling_factor;
     ctx->monitor_size       = monitor_size;
     ctx->monitor_resolution = monitor_resolution;
+    ctx->measure_text       = fn;
+    ctx->font_size          = md_mm2px_ctx(ctx, 4);
     ctx->cmd_list = (md_command_t*)cmd_list_memory;
 }
 
-bool md_ctx_append_command(md_command_t cmd) { return md_ctx_append_command_ctx(&CTX, cmd); }
-bool md_ctx_append_command_ctx(md_ctx_t* ctx, md_command_t cmd) {
+bool md_ctx_append(md_command_t cmd) { return md_ctx_append_ctx(&CTX, cmd); }
+bool md_ctx_append_ctx(md_ctx_t* ctx, md_command_t cmd) {
     if (ctx->cmd_list == NULL) {
         MD_ERROR("Context memory not initialized.");
+        UNREACHABLE();
         return false;
     }
     if (ctx->cmd_list_len >= MD_COMMANDS_MAXIMUM_QUANTITY) {
         MD_ERROR("Context memory was not big enough.");
+        UNREACHABLE();
         return false;
     }
     ctx->cmd_list[ctx->cmd_list_len++] = cmd;
     return true;
 }
 
+bool md_ctx_poll(md_command_t* cmd) { return md_ctx_poll_ctx(&CTX, cmd); }
+bool md_ctx_poll_ctx(md_ctx_t* ctx, md_command_t* cmd) {
+    if (ctx->cmd_list == NULL) {
+        MD_ERROR("Context memory not initialized.");
+        UNREACHABLE();
+        return false;
+    }
+    if (ctx->cmd_list_len == 0) {
+        return false;
+    }
+    if (ctx->cmd_list_poll_index >= ctx->cmd_list_len) {
+        ctx->cmd_list_len = 0;
+        ctx->cmd_list_poll_index = 0;
+        return false;
+    }
+    *cmd = ctx->cmd_list[ctx->cmd_list_poll_index++];
+    return true;
+}
+
 md_button_t md_button(md_button_t button) { return md_button_ctx(&CTX, button); }
 md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button) {
-    UNUSED(ctx);
     // {{{
-    u8 shadow_amount = 0;
-    f32 state_layer = 0; // background shape, with foreground color, with opacity=state_layer
+    #define TRY_SET(var, col) (COLOR_UNSET(var) ? ((var) = (col), true) : (false))
+    UNUSED(ctx);
 
-    switch (button.state) {
-        case MD_BUTTON_STATE_DEFAULT: {
-        }; break;
-        case MD_BUTTON_STATE_DISABLED: {
-            if (COLOR_UNSET(button.bg)) {
-                button.bg = COLOR.Scheme.OnSurface;
-                button.bg.a = (u8)((f32)button.bg.a * 0.1);
-            }
-            if (COLOR_UNSET(button.fg)) {
-                button.fg = COLOR.Scheme.OnSurfaceVariant;
-                button.fg.a = (u8)((f32)button.fg.a * 0.4);
-            }
-        }; break;
-        case MD_BUTTON_STATE_HOVERED: {
-            state_layer = 0.1; // should be 0.08
-            shadow_amount += 1;
-        }; break;
-        case MD_BUTTON_STATE_FOCUSED: {
-            state_layer = 0.15; // should be 0.1
-        }; break;
-        case MD_BUTTON_STATE_PRESSED: {
-            state_layer = 0.15; // should be 0.1
-        }; break;
-        default: MD_ERROR("Unknown button state.");
+    bool d_ele=0, d_fil=0, d_ton=0, d_out=0, d_txt=0;
+    switch (button.design) {
+        // {{{
+        case MD_BUTTON_DESIGN_ELEVATED: d_ele=1; break;
+        case MD_BUTTON_DESIGN_FILLED:   d_fil=1; break;
+        case MD_BUTTON_DESIGN_TONAL:    d_ton=1; break;
+        case MD_BUTTON_DESIGN_OUTLINED: d_out=1; break;
+        case MD_BUTTON_DESIGN_TEXT:     d_txt=1; break;
+        default: MD_ERROR("Unknown button design."); UNREACHABLE();
+        // }}}
     }
 
-    switch (button.style) {
-        case MD_BUTTON_DESIGN_ELEVATED: {
-            if (button.state != MD_BUTTON_STATE_DISABLED) {
-                shadow_amount += 1;
-            }
-            switch (button.type) {
-                case MD_BUTTON_TYPE_DEFAULT: {
-                    if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.SurfaceContainerLow;
-                    if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.Primary;
-                }; break;
-                case MD_BUTTON_TYPE_TOGGLE: {
-                    switch (button.toggle) {
-                        case MD_BUTTON_TOGGLE_UNSELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.SurfaceContainerLow;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.Primary;
-                        }; break;
-                        case MD_BUTTON_TOGGLE_SELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.Primary;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnPrimary;
-                        }; break;
-                        default: MD_ERROR("Unknown button toggle.");
-                    }
-                }; break;
-                default: MD_ERROR("Unknown button type.");
-            }
-        }; break;
-        case MD_BUTTON_DESIGN_FILLED: {
-            switch (button.type) {
-                case MD_BUTTON_TYPE_DEFAULT: {
-                    if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.Primary;
-                    if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnPrimary;
-                }; break;
-                case MD_BUTTON_TYPE_TOGGLE: {
-                    switch (button.toggle) {
-                        case MD_BUTTON_TOGGLE_UNSELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.SurfaceContainer;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnSurfaceVariant;
-                        }; break;
-                        case MD_BUTTON_TOGGLE_SELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.Primary;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnPrimary;
-                        }; break;
-                        default: MD_ERROR("Unknown button toggle.");
-                    }
-                }; break;
-                default: MD_ERROR("Unknown button type.");
-            }
-        }; break;
-        case MD_BUTTON_DESIGN_TONAL: {
-            switch (button.type) {
-                case MD_BUTTON_TYPE_DEFAULT: {
-                    if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.SecondaryContainer;
-                    if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnSecondaryContainer;
-                }; break;
-                case MD_BUTTON_TYPE_TOGGLE: {
-                    switch (button.toggle) {
-                        case MD_BUTTON_TOGGLE_UNSELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.SecondaryContainer;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnSecondaryContainer;
-                        }; break;
-                        case MD_BUTTON_TOGGLE_SELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.Secondary;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnSecondary;
-                        }; break;
-                        default: MD_ERROR("Unknown button toggle.");
-                    }
-                }; break;
-                default: MD_ERROR("Unknown button type.");
-            }
-        }; break;
-        case MD_BUTTON_DESIGN_OUTLINED: {
-            state_layer = 0.1;
-            switch (button.type) {
-                case MD_BUTTON_TYPE_DEFAULT: {
-                    if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.OutlineVariant;
-                    if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnSurfaceVariant;
-                }; break;
-                case MD_BUTTON_TYPE_TOGGLE: {
-                    switch (button.toggle) {
-                        case MD_BUTTON_TOGGLE_UNSELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.OutlineVariant;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.OnSurfaceVariant;
-                        }; break;
-                        case MD_BUTTON_TOGGLE_SELECTED: {
-                            if (COLOR_UNSET(button.bg)) button.bg = COLOR.Scheme.InverseSurface;
-                            if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.InverseOnSurface;
-                        }; break;
-                        default: MD_ERROR("Unknown button toggle.");
-                    }
-                }; break;
-                default: MD_ERROR("Unknown button type.");
-            }
-        }; break;
-        case MD_BUTTON_DESIGN_TEXT: {
-            switch (button.type) {
-                case MD_BUTTON_TYPE_DEFAULT: {
-                    if (COLOR_UNSET(button.fg)) button.fg = COLOR.Scheme.Primary;
-                }; break;
-                default: MD_ERROR("Button style 'Text' does not support 'Toggle' type.");
-            }
-        }; break;
-        default: MD_ERROR("Unknown button design.");
+    bool s_ena=0, s_dis=0, s_hov=0, s_foc=0, s_pre=0;
+    switch (button.state) {
+        // {{{
+        case MD_BUTTON_STATE_ENABLED:  s_ena=1; break;
+        case MD_BUTTON_STATE_DISABLED: s_dis=1; break;
+        case MD_BUTTON_STATE_HOVERED:  s_hov=1; break;
+        case MD_BUTTON_STATE_FOCUSED:  s_foc=1; break;
+        case MD_BUTTON_STATE_PRESSED:  s_pre=1; break;
+        default: MD_ERROR("Unknown button state."); UNREACHABLE();
+        // }}}
+    }
+
+    bool t_def=0, t_uns=0, t_sel=0;
+    switch (button.type) {
+        // {{{
+        case MD_BUTTON_TYPE_DEFAULT: t_def=1; break;
+        case MD_BUTTON_TYPE_UNSELECTED: t_uns=1; break;
+        case MD_BUTTON_TYPE_SELECTED:   t_sel=1; break;
+        default: MD_ERROR("Unknown button type."); UNREACHABLE();
+        // }}}
+    }
+
+    u8 elevation = 0; // basically a shadow
+    if (d_ele && (s_ena || s_pre)) elevation = 1;
+    if (d_ele && (s_hov || s_foc)) elevation = 2;
+    if (d_fil && s_hov && (t_uns || t_sel)) elevation = 1;
+    if (d_ton && s_hov) elevation = 1;
+
+    u8 state_layer = 0; // background shape, foreground color, with opacity=state_layer
+    if (s_hov) state_layer = (u8)(255.0*0.1); // should be 0.08
+    if (s_foc || s_pre) state_layer = (u8)(255.0*0.15); // should be 0.1
+    if (s_dis) {
+        if (TRY_SET(button.bg, COLOR.Scheme.OnSurface)) {
+            button.bg.a = (u8)((f32)button.bg.a * 0.1);
+        }
+        if (TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant)) {
+            button.fg.a = (u8)((f32)button.fg.a * 0.4);
+        }
+    }
+
+    if (t_def || t_uns) {
+        button.round.tl = md_mm2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.tr = md_mm2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.bl = md_mm2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.br = md_mm2px_ctx(ctx, MD_ROUND_FULL);
+    }
+    if (t_sel) {
+        button.round.tl = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
+        button.round.tr = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
+        button.round.bl = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
+        button.round.br = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
+    }
+
+    if (d_ele) {
+        if (t_def) {
+            TRY_SET(button.bg, COLOR.Scheme.SurfaceContainerLow);
+            TRY_SET(button.fg, COLOR.Scheme.Primary);
+        }
+        if (t_uns) {
+            TRY_SET(button.bg, COLOR.Scheme.SurfaceContainerLow);
+            TRY_SET(button.fg, COLOR.Scheme.Primary);
+        }
+        if (t_sel) {
+            TRY_SET(button.bg, COLOR.Scheme.Primary);
+            TRY_SET(button.fg, COLOR.Scheme.OnPrimary);
+        }
+    }
+    if (d_fil) {
+        if (t_def) {
+            TRY_SET(button.bg, COLOR.Scheme.Primary);
+            TRY_SET(button.fg, COLOR.Scheme.OnPrimary);
+        }
+        if (t_uns) {
+            TRY_SET(button.bg, COLOR.Scheme.SurfaceContainer);
+            TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant);
+        }
+        if (t_sel) {
+            TRY_SET(button.bg, COLOR.Scheme.Primary);
+            TRY_SET(button.fg, COLOR.Scheme.OnPrimary);
+        }
+    }
+    if (d_ton) {
+        if (t_def) {
+            TRY_SET(button.bg, COLOR.Scheme.SecondaryContainer);
+            TRY_SET(button.fg, COLOR.Scheme.OnSecondaryContainer);
+        }
+        if (t_uns) {
+            TRY_SET(button.bg, COLOR.Scheme.SecondaryContainer);
+            TRY_SET(button.fg, COLOR.Scheme.OnSecondaryContainer);
+        }
+        if (t_sel) {
+            TRY_SET(button.bg, COLOR.Scheme.Secondary);
+            TRY_SET(button.fg, COLOR.Scheme.OnSecondary);
+        }
+    }
+    if (d_out) {
+        if (t_def) {
+            TRY_SET(button.bg, COLOR.Scheme.OutlineVariant);
+            TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant);
+        }
+        if (t_uns) {
+            TRY_SET(button.bg, COLOR.Scheme.OutlineVariant);
+            TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant);
+        }
+        if (t_sel) {
+            TRY_SET(button.bg, COLOR.Scheme.InverseSurface);
+            TRY_SET(button.fg, COLOR.Scheme.InverseOnSurface);
+        }
+    }
+    if (d_txt) {
+        if (t_def) {
+            TRY_SET(button.fg, COLOR.Scheme.Primary);
+        } else {
+            MD_WARN("Button Text Design Does Not Support Toggle.");
+        }
     }
 
     button.state_layer = state_layer;
+    button.elevation = elevation;
     return button;
+
+    #undef TRY_SET
     // }}}
 }
 
@@ -413,7 +450,27 @@ bool md_render_button(md_button_t button) { return md_render_button_ctx(&CTX, bu
 bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button) {
     UNUSED(ctx);
     UNUSED(button);
-    // md_ctx_append_command_ctx(ctx, cmd);
+
+    md_command_t cmd = {0};
+    cmd.type = MD_COMMAND_DRAW_BOX;
+    cmd.as.box.box = button.box;
+    cmd.as.box.color = button.bg;
+    cmd.as.box.round = button.round;
+    md_ctx_append_ctx(ctx, cmd);
+
+    cmd = (md_command_t){0};
+    cmd.type = MD_COMMAND_DRAW_TEXT;
+    cmd.as.text.box = button.box;
+    cmd.as.text.color = button.fg;
+    cmd.as.text.text = button.text;
+    cmd.as.text.font_size = ctx->font_size;
+
+    vec2 text_sz = ctx->measure_text(button.text, ctx->font_size);
+    cmd.as.text.box.x += (cmd.as.text.box.w-text_sz.x)/2;
+    cmd.as.text.box.y += (cmd.as.text.box.h-text_sz.y)/2;
+
+    md_ctx_append_ctx(ctx, cmd);
+
     return true;
 }
 
@@ -532,9 +589,6 @@ void md_color_global_switch_theme() {
         COLOR.Scheme = COLOR.SchemeDark;
     }
 }
-
 /* }}} */
 
-/* }}} */
-
-#endif /* MD_UI */
+#endif /* MD_UI_IMPLEMENTATION }}} */
