@@ -151,6 +151,7 @@ void DrawBoxRoundLines(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f3
     w9 = w;
     h9 = h - MAX(r1, r2) - MAX(r3, r4);
 
+    // TODO:make this actually useful...
     if (r1 > 0) DrawCircleSectorLines((Vector2){x1,y1}, r1, 180, 270, 10, bg);
     if (r2 > 0) DrawCircleSectorLines((Vector2){x2,y2}, r2, 270, 360, 10, bg);
     if (r3 > 0) DrawCircleSectorLines((Vector2){x3,y3}, r3,  90, 180, 10, bg);
@@ -193,8 +194,8 @@ void DrawLayout() {
 
 #define R(N) (rand()%(N))
 
-vec2 measure_text_fn(char* text, f32 font_size) {
-    return MeasureTextEx(roboto, text, font_size, 0);
+vec2 measure_text_fn(char* text, f32 font_size_px) {
+    return MeasureTextEx(roboto, text, font_size_px, 0);
 }
 
 int main(void) {
@@ -207,11 +208,10 @@ int main(void) {
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
 
-    vec2 scaling_factor = (vec2){1,1};
     vec2 monitor_size = (vec2){GetMonitorPhysicalWidth(GetCurrentMonitor()), GetMonitorPhysicalHeight(GetCurrentMonitor())};
     vec2 monitor_resolution = (vec2){GetMonitorWidth(GetCurrentMonitor()), GetMonitorHeight(GetCurrentMonitor())};
     void* cmd_list_memory = calloc(MD_COMMANDS_MAXIMUM_QUANTITY, sizeof(md_command_t));
-    md_ctx_init(scaling_factor, monitor_size, monitor_resolution, cmd_list_memory, measure_text_fn);
+    md_ctx_init(monitor_size, monitor_resolution, cmd_list_memory, measure_text_fn);
 
     roboto = LoadFontEx(ROBOTO_FLEX, 20, NULL, 0);
     GenTextureMipmaps(&roboto.texture);

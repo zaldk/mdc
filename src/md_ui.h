@@ -178,15 +178,16 @@ typedef struct {
     } as;
 } md_command_t;
 
-typedef vec2 (*md_measure_text_fn)(char* text, f32 font_size);
+typedef vec2 (*md_measure_text_fn)(char* text, f32 font_size_px);
 
 typedef struct {
-    vec2 scaling_factor; // global scaling of the window manager
-    vec2 monitor_size; // physical size, in mm
-    vec2 monitor_resolution; // width and height, in pixels
+    vec2 monitor_size_mm; // physical size, in mm
+    vec2 monitor_size_px; // width and height, in pixels
+    f32 scaling_factor;   // default 1.0, used for in-app scaling.
+    f32 ppi;              // pixels per inch
 
     md_measure_text_fn measure_text; // required
-    f32 font_size;
+    f32 font_size; // 30dp by default
 
     md_command_t* cmd_list; // must be at least MD_COMMANDS_MAXIMUM_QUANTITY
     u32 cmd_list_len;
@@ -194,17 +195,17 @@ typedef struct {
 } md_ctx_t;
 static md_ctx_t CTX = {0};
 
-void md_ctx_init(vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn);
-void md_ctx_init_ctx(md_ctx_t* ctx, vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn);
+void md_ctx_init(vec2 monitor_size_mm, vec2 monitor_size_px, void* cmd_list_memory, md_measure_text_fn fn);
+void md_ctx_init_ctx(md_ctx_t* ctx, vec2 monitor_size_mm, vec2 monitor_size_px, void* cmd_list_memory, md_measure_text_fn fn);
 bool md_ctx_append(md_command_t cmd);
 bool md_ctx_append_ctx(md_ctx_t* ctx, md_command_t cmd);
 bool md_ctx_poll(md_command_t* cmd);
 bool md_ctx_poll_ctx(md_ctx_t* ctx, md_command_t* cmd);
 
-f32 md_px2mm(i32 px);
-f32 md_px2mm_ctx(md_ctx_t* ctx, i32 px);
-i32 md_mm2px(f32 mm);
-i32 md_mm2px_ctx(md_ctx_t* ctx, f32 mm);
+f32 md_px2dp(i32 px);
+f32 md_px2dp_ctx(md_ctx_t* ctx, i32 px);
+i32 md_dp2px(f32 dp);
+i32 md_dp2px_ctx(md_ctx_t* ctx, f32 dp);
 
 /* https://m3.material.io/components/buttons/overview */
 MD_ENUM(u8, md_button_state_t) {
@@ -247,6 +248,8 @@ typedef struct {
 // When some info is omitted, the functions will fill it in and return the object back.
 md_button_t md_button(md_button_t button);
 md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button);
+
+// These will "render" the objects into Context by appending commands.
 bool md_render_button(md_button_t button);
 bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button);
 
@@ -256,20 +259,26 @@ bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button);
 
 #ifdef MD_UI_IMPLEMENTATION /* {{{ */
 
-void md_ctx_init(vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn) {
-    md_ctx_init_ctx(&CTX, scaling_factor, monitor_size, monitor_resolution, cmd_list_memory, fn);
+void md_ctx_init(vec2 monitor_size_mm, vec2 monitor_size_px, void* cmd_list_memory, md_measure_text_fn fn) {
+    md_ctx_init_ctx(&CTX, monitor_size_mm, monitor_size_px, cmd_list_memory, fn);
 }
-void md_ctx_init_ctx(md_ctx_t* ctx, vec2 scaling_factor, vec2 monitor_size, vec2 monitor_resolution, void* cmd_list_memory, md_measure_text_fn fn) {
-    ctx->scaling_factor     = scaling_factor;
-    ctx->monitor_size       = monitor_size;
-    ctx->monitor_resolution = monitor_resolution;
-    ctx->measure_text       = fn;
-    ctx->font_size          = md_mm2px_ctx(ctx, 4);
+void md_ctx_init_ctx(md_ctx_t* ctx, vec2 monitor_size_mm, vec2 monitor_size_px, void* cmd_list_memory, md_measure_text_fn fn) {
+    // {{{
+    ctx->monitor_size_mm = monitor_size_mm;
+    ctx->monitor_size_px = monitor_size_px;
+    ctx->scaling_factor  = 1;
+    ctx->ppi = monitor_size_px.x / (monitor_size_mm.x/25.4f);
+
+    ctx->measure_text = fn;
+    ctx->font_size    = 30;
+
     ctx->cmd_list = (md_command_t*)cmd_list_memory;
+    // }}}
 }
 
 bool md_ctx_append(md_command_t cmd) { return md_ctx_append_ctx(&CTX, cmd); }
 bool md_ctx_append_ctx(md_ctx_t* ctx, md_command_t cmd) {
+    // {{{
     if (ctx->cmd_list == NULL) {
         MD_ERROR("Context memory not initialized.");
         UNREACHABLE();
@@ -282,10 +291,12 @@ bool md_ctx_append_ctx(md_ctx_t* ctx, md_command_t cmd) {
     }
     ctx->cmd_list[ctx->cmd_list_len++] = cmd;
     return true;
+    // }}}
 }
 
 bool md_ctx_poll(md_command_t* cmd) { return md_ctx_poll_ctx(&CTX, cmd); }
 bool md_ctx_poll_ctx(md_ctx_t* ctx, md_command_t* cmd) {
+    // {{{
     if (ctx->cmd_list == NULL) {
         MD_ERROR("Context memory not initialized.");
         UNREACHABLE();
@@ -301,6 +312,7 @@ bool md_ctx_poll_ctx(md_ctx_t* ctx, md_command_t* cmd) {
     }
     *cmd = ctx->cmd_list[ctx->cmd_list_poll_index++];
     return true;
+    // }}}
 }
 
 md_button_t md_button(md_button_t button) { return md_button_ctx(&CTX, button); }
@@ -362,16 +374,16 @@ md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button) {
     }
 
     if (t_def || t_uns) {
-        button.round.tl = md_mm2px_ctx(ctx, MD_ROUND_FULL);
-        button.round.tr = md_mm2px_ctx(ctx, MD_ROUND_FULL);
-        button.round.bl = md_mm2px_ctx(ctx, MD_ROUND_FULL);
-        button.round.br = md_mm2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.tl = md_dp2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.tr = md_dp2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.bl = md_dp2px_ctx(ctx, MD_ROUND_FULL);
+        button.round.br = md_dp2px_ctx(ctx, MD_ROUND_FULL);
     }
     if (t_sel) {
-        button.round.tl = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
-        button.round.tr = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
-        button.round.bl = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
-        button.round.br = md_mm2px_ctx(ctx, MD_ROUND_SMALL);
+        button.round.tl = md_dp2px_ctx(ctx, MD_ROUND_MEDIUM);
+        button.round.tr = md_dp2px_ctx(ctx, MD_ROUND_MEDIUM);
+        button.round.bl = md_dp2px_ctx(ctx, MD_ROUND_MEDIUM);
+        button.round.br = md_dp2px_ctx(ctx, MD_ROUND_MEDIUM);
     }
 
     if (d_ele) {
@@ -448,9 +460,7 @@ md_button_t md_button_ctx(md_ctx_t* ctx, md_button_t button) {
 
 bool md_render_button(md_button_t button) { return md_render_button_ctx(&CTX, button); }
 bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button) {
-    UNUSED(ctx);
-    UNUSED(button);
-
+    // {{{
     md_command_t cmd = {0};
     cmd.type = MD_COMMAND_DRAW_BOX;
     cmd.as.box.box = button.box;
@@ -463,25 +473,25 @@ bool md_render_button_ctx(md_ctx_t* ctx, md_button_t button) {
     cmd.as.text.box = button.box;
     cmd.as.text.color = button.fg;
     cmd.as.text.text = button.text;
-    cmd.as.text.font_size = ctx->font_size;
+    cmd.as.text.font_size = md_dp2px_ctx(ctx, ctx->font_size);
 
-    vec2 text_sz = ctx->measure_text(button.text, ctx->font_size);
+    vec2 text_sz = ctx->measure_text(button.text, cmd.as.text.font_size);
     cmd.as.text.box.x += (cmd.as.text.box.w-text_sz.x)/2;
     cmd.as.text.box.y += (cmd.as.text.box.h-text_sz.y)/2;
-
     md_ctx_append_ctx(ctx, cmd);
 
     return true;
+    // }}}
 }
 
-f32 md_px2mm(i32 px) { return md_px2mm_ctx(&CTX, px); }
-f32 md_px2mm_ctx(md_ctx_t* ctx, i32 px) {
-    return (f32)px * ctx->monitor_size.x / ctx->monitor_resolution.x;
+f32 md_px2dp(i32 px) { return md_px2dp_ctx(&CTX, px); }
+f32 md_px2dp_ctx(md_ctx_t* ctx, i32 px) {
+    return (f32)px / (ctx->scaling_factor * ctx->ppi/160.0f);
 }
 
-i32 md_mm2px(f32 mm) { return md_mm2px_ctx(&CTX, mm); }
-i32 md_mm2px_ctx(md_ctx_t* ctx, f32 mm) {
-    return (i32) (mm * ctx->monitor_resolution.x / ctx->monitor_size.x);
+i32 md_dp2px(f32 dp) { return md_dp2px_ctx(&CTX, dp); }
+i32 md_dp2px_ctx(md_ctx_t* ctx, f32 dp) {
+    return (i32)(dp * (ctx->scaling_factor * ctx->ppi/160.0f));
 }
 
 /* Color Initialization Macro Magic {{{ */
