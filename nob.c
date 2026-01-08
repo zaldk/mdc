@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 
     char* arg_demo = shift(argv, argc);
 
-    if (arg_demo != NULL && arg_demo[0] >= '1' && arg_demo[0] <= '9') {
+    if (arg_demo != NULL && arg_demo[0] >= '0' && arg_demo[0] <= '9') {
         char build_here[64] = {0};
         snprintf((char*)build_here, 64, BUILD"demo-%c.exe", arg_demo[0]);
         char* source_here[64] = {0};
@@ -42,11 +42,10 @@ int main(int argc, char **argv) {
 
         nob_cc(&cmd);
         cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=gnu99");
-        // cmd_append(&cmd, "-Wno-unused-parameter", "-Wno-unused-variable");
-        cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
-        cmd_append(&cmd, "-L./thirdparty/raylib-5.5_linux_amd64/lib/");
+        // cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
+        cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
         cmd_append(&cmd, "-o", (char*)build_here, (char*)source_here);
-        cmd_append(&cmd, "-lm", "-lraylib");
+        cmd_append(&cmd, "-lm", "-l:libraylib.a");
         if (!cmd_run(&cmd)) return 1;
 
         nob_log(NOB_INFO, "Built Demo %c", arg_demo[0]);

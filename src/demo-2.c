@@ -1,4 +1,4 @@
-#include "../thirdparty/raylib-5.5_linux_amd64/include/raylib.h"
+#include "../thirdparty/raylib/include/raylib.h"
 #include "../thirdparty/RAYLIB_PREFIXES.h"
 #define MD_UI_IMPLEMENTATION
 #include "md_ui.h"

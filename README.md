@@ -31,11 +31,6 @@ cc -o nob nob.c
 
 ## Demo 4 - Button Reference
 
-> [!NOTE]
-> This is a WIP (work in progress)
-> Currently there are only the used colors + state layers (SL is possibly done incorrectly).
-> The Hovered state and Elevated and Outline styles should have effects such as shadows and outlines.
-
 | Dark Scheme | Light Scheme |
 |-------------|--------------|
 | ![Dark Theme](images/demo_4_button_colors_dark.png) | ![Light Theme](images/demo_4_button_colors_light.png) |

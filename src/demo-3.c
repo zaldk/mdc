@@ -1,4 +1,4 @@
-#include "../thirdparty/raylib-5.5_linux_amd64/include/raylib.h"
+#include "../thirdparty/raylib/include/raylib.h"
 #include "../thirdparty/RAYLIB_PREFIXES.h"
 #define MD_UI_IMPLEMENTATION
 #include "md_ui.h"
@@ -14,12 +14,7 @@
 #define ROBOTO_CONDENSED "assets/Roboto/Condensed/static/RobotoCondensed-Regular.ttf"
 static Font roboto;
 
-void DrawTextCentered(const char* text, f32 size, int x, int y, int w, int h, color_t fg) {
-    Vector2 sz = MeasureTextEx(roboto, text, size, 0);
-    DrawTextEx(roboto, text, (Vector2){x+(w-sz.x)/2, y+(h-sz.y)/2}, size, 0, RL(fg));
-}
-
-void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr, color_t bg) {
+void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr, MDColor bg) {
     UNUSED(bg);
     /* Normal
         /--+---+--\

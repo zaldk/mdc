@@ -1,4 +1,4 @@
-#include "../thirdparty/raylib-5.5_linux_amd64/include/raylib.h"
+#include "../thirdparty/raylib/include/raylib.h"
 #include "../thirdparty/RAYLIB_PREFIXES.h"
 #define MD_UI_IMPLEMENTATION
 #include "md_ui.h"
@@ -95,7 +95,7 @@ void DrawLayout1() {
     DrawColorCard("Inverse Primary", inverse_start_x, y, w_full, h, RL(COLOR.Scheme.InversePrimary), RL(COLOR.Scheme.OnPrimaryContainer));
 }
 
-void DrawContainer(char* text, int x, int y, int w, int h, color_t bg, color_t fg) {
+void DrawContainer(char* text, int x, int y, int w, int h, MDColor bg, MDColor fg) {
     DrawRectangleRec((Rectangle){x, y, w, h}, RL(bg));
     Vector2 sz = MeasureTextEx(roboto, text, 15.0, 0.0);
     DrawTextEx(roboto, text, (Vector2){x+(w-sz.x)/2.0, y+10}, 15.0, 0.0, RL(fg));
