@@ -150,8 +150,9 @@ MD_ENUM(u8, MDSize) { MD_SIZE_XS, MD_SIZE_S, MD_SIZE_M, MD_SIZE_L, MD_SIZE_XL, }
 typedef u8 MDCommandType; enum {
     MD_COMMAND_DRAW_NONE,
     MD_COMMAND_DRAW_BOX,
-    MD_COMMAND_DRAW_BOX_OUTLINE,
+    MD_COMMAND_DRAW_OUTLINE,
     MD_COMMAND_DRAW_TEXT,
+    MD_COMMAND_DRAW_ICON,
 };
 typedef struct {
     MDCommandType type;
@@ -166,13 +167,19 @@ typedef struct {
             MDColor color;
             MDCorners round;
             f32 thickness;
-        } box_outline;
+        } outline;
         struct {
             MDBox box; // width and height are for scissor mode, ignored if 0
-            char* text;
             MDColor color;
+            char* text;
             f32 font_size;
         } text;
+        struct {
+            MDBox box; // width and height are for scissor mode, ignored if 0
+            MDColor color;
+            i32 codepoint;
+            f32 icon_size;
+        } icon;
     } as;
 } MDCommand;
 
@@ -181,7 +188,7 @@ typedef Vec2 (*MDMeasureTextFn)(char* text, f32 font_size_px);
 typedef struct {
     Vec2 monitor_size_mm; // physical size, in mm
     Vec2 monitor_size_px; // width and height, in pixels
-    f32 scaling_factor;   // default 1.0, used for in-app scaling.
+    f32 scaling;   // default 1.0, used for in-app scaling.
     f32 ppi;              // pixels per inch
 
     MDMeasureTextFn measure_text; // required
@@ -194,6 +201,8 @@ static MDContext CTX = {0};
 
 void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px, void* cmd_list_memory, MDMeasureTextFn fn);
 void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px, void* cmd_list_memory, MDMeasureTextFn fn);
+void md_ctx_set_scaling(f32 scaling);
+void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling);
 bool md_ctx_append(MDCommand cmd);
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd);
 bool md_ctx_poll(MDCommand* cmd);
@@ -235,11 +244,10 @@ typedef struct {
     u8 state_layer;  // inferred
     u8 elevation;    // inferred
 
-    char* text;             // required
-    f32 font_size;          // inferred
-    Vec2 text_size;         // inferred
-    MDTextAlign text_align; // inferred
-    MDColor fg;             // inferred
+    char* text;     // required
+    f32 font_size;  // inferred
+    Vec2 text_size; // inferred
+    MDColor fg;     // inferred
 
     MDButtonType type;     // required
     MDButtonState state;   // required
@@ -251,10 +259,49 @@ typedef struct {
 // When some info is omitted, the functions will fill it in and return the object back.
 MDButton md_button(MDButton button);
 MDButton md_button_ctx(MDContext* ctx, MDButton button);
-
-// These will "render" the objects into Context by appending commands.
+// These will "render" the objects into Context by appending draw commands.
 bool md_render_button(MDButton button);
 bool md_render_button_ctx(MDContext* ctx, MDButton button);
+
+MD_ENUM(u8, MDTabType) {
+    MD_TAB_TYPE_PRIMARY,
+    MD_TAB_TYPE_SECONDARY,
+};
+MD_ENUM(u8, MDTabState) {
+    MD_TAB_STATE_ENABLED,
+    MD_TAB_STATE_HOVERED,
+    MD_TAB_STATE_FOCUSED,
+    MD_TAB_STATE_PRESSED,
+};
+MD_ENUM(u8, MDTabIconAlignment) {
+    MD_TAB_ICON_ALIGN_INLINED,
+    MD_TAB_ICON_ALIGN_STACKED,
+};
+typedef void(*MDCallbackTab)(void);
+typedef struct {
+    MDBox box;      // X,Y,W - required; H - inferred;
+    MDColor bg;     // inferred
+    u8 state_layer; // inferred
+
+    char* text;     // required
+    f32 font_size;  // inferred
+    Vec2 text_size; // inferred
+    MDColor fg;     // inferred
+    i32 icon_code;  // optional
+    f32 icon_size;  // inferred
+    MDTabIconAlignment icon_align; // optional
+
+    MDTabType type;   // required
+    MDTabState state; // required
+    bool active;      // required
+
+    MDCallbackTab cb; // optional
+} MDTab;
+
+MDTab md_tab(MDTab tab);
+MDTab md_tab_ctx(MDContext* ctx, MDTab tab);
+bool md_render_tab(MDTab tab);
+bool md_render_tab_ctx(MDContext* ctx, MDTab tab);
 
 #endif /* MD_UI }}} */
 
@@ -271,11 +318,16 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px,
     // {{{
     ctx->monitor_size_mm = monitor_size_mm;
     ctx->monitor_size_px = monitor_size_px;
-    ctx->scaling_factor  = 1;
+    ctx->scaling  = 1;
     ctx->ppi = monitor_size_px.x / (monitor_size_mm.x/25.4f);
     ctx->measure_text = fn == NULL ? empty_measure_text_fn : fn;
     ctx->cmd_list = (MDCommand*)cmd_list_memory;
     // }}}
+}
+
+void md_ctx_set_scaling(f32 scaling) { md_ctx_set_scaling_ctx(&CTX, scaling); }
+void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling) {
+    ctx->scaling = scaling;
 }
 
 bool md_ctx_append(MDCommand cmd) { return md_ctx_append_ctx(&CTX, cmd); }
@@ -523,11 +575,11 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
         if (button.size == MD_SIZE_L) thickness = 2;
         if (button.size == MD_SIZE_XL) thickness = 3;
         thickness = md_dp2px_ctx(ctx, thickness);
-        cmd.type = MD_COMMAND_DRAW_BOX_OUTLINE;
-        cmd.as.box_outline.box = button.box;
-        cmd.as.box_outline.color = button.bg;
-        cmd.as.box_outline.round = button.round;
-        cmd.as.box_outline.thickness = md_dp2px_ctx(ctx, thickness);
+        cmd.type = MD_COMMAND_DRAW_OUTLINE;
+        cmd.as.outline.box = button.box;
+        cmd.as.outline.color = button.bg;
+        cmd.as.outline.round = button.round;
+        cmd.as.outline.thickness = md_dp2px_ctx(ctx, thickness);
         APPEND(cmd);
     }
 
@@ -541,19 +593,19 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
         if (button.size == MD_SIZE_XL) thickness = 3;
         thickness = md_dp2px_ctx(ctx, thickness);
         thickness *= 2 + offset;
-        cmd.type = MD_COMMAND_DRAW_BOX_OUTLINE;
-        cmd.as.box_outline.box = button.box;
-        cmd.as.box_outline.box.x -= thickness;
-        cmd.as.box_outline.box.y -= thickness;
-        cmd.as.box_outline.box.w += thickness*2;
-        cmd.as.box_outline.box.h += thickness*2;
-        cmd.as.box_outline.color = COLOR.Scheme.Outline; // probably
-        cmd.as.box_outline.round = button.round;
-        cmd.as.box_outline.round.tl += thickness;
-        cmd.as.box_outline.round.tr += thickness;
-        cmd.as.box_outline.round.bl += thickness;
-        cmd.as.box_outline.round.br += thickness;
-        cmd.as.box_outline.thickness = md_dp2px_ctx(ctx, thickness/(2+offset)*2);
+        cmd.type = MD_COMMAND_DRAW_OUTLINE;
+        cmd.as.outline.box = button.box;
+        cmd.as.outline.box.x -= thickness;
+        cmd.as.outline.box.y -= thickness;
+        cmd.as.outline.box.w += thickness*2;
+        cmd.as.outline.box.h += thickness*2;
+        cmd.as.outline.color = COLOR.Scheme.OnSurfaceVariant; // probably
+        cmd.as.outline.round = button.round;
+        cmd.as.outline.round.tl += thickness;
+        cmd.as.outline.round.tr += thickness;
+        cmd.as.outline.round.bl += thickness;
+        cmd.as.outline.round.br += thickness;
+        cmd.as.outline.thickness = md_dp2px_ctx(ctx, thickness/(2+offset)*2);
         APPEND(cmd);
     }
 
@@ -571,16 +623,207 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
     // }}}
 }
 
+MDTab md_tab(MDTab tab) { return md_tab_ctx(&CTX, tab); }
+MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
+    // {{{
+    #define TRY_SET(var, col) (COLOR_UNSET(var) ? ((var) = (col), true) : (false))
+
+    bool t_pri=0, t_sec=0;
+    switch (tab.type) {
+        // {{{
+        case MD_TAB_TYPE_PRIMARY:   t_pri=1; break;
+        case MD_TAB_TYPE_SECONDARY: t_sec=1; break;
+        default: MD_ERROR("Unknown tab type."); UNREACHABLE();
+        // }}}
+    }
+
+    bool s_ena=0, s_hov=0, s_foc=0, s_pre=0;
+    switch (tab.state) {
+        // {{{
+        case MD_TAB_STATE_ENABLED:  s_ena=1; break;
+        case MD_TAB_STATE_HOVERED:  s_hov=1; break;
+        case MD_TAB_STATE_FOCUSED:  s_foc=1; break;
+        case MD_TAB_STATE_PRESSED:  s_pre=1; break;
+        default: MD_ERROR("Unknown tab state."); UNREACHABLE();
+        // }}}
+    }
+
+    bool a_inl=0, a_sta=0;
+    switch (tab.icon_align) {
+        // {{{
+        case MD_TAB_ICON_ALIGN_INLINED: a_inl=1; break;
+        case MD_TAB_ICON_ALIGN_STACKED: a_sta=1; break;
+        default: MD_ERROR("Unknown tab icon alignment."); UNREACHABLE();
+        // }}}
+    }
+
+    if (s_hov) tab.state_layer = (u8)(255.0f*0.1f); // should be 0.08
+    if (s_pre || (s_foc && tab.active)) tab.state_layer = (u8)(255.0f*0.15f); // should be 0.1
+
+    TRY_SET(tab.bg, COLOR.Scheme.Surface);
+
+    if ( tab.active &&  t_pri) TRY_SET(tab.fg, COLOR.Scheme.Primary);
+    if ( tab.active &&  t_sec) TRY_SET(tab.fg, COLOR.Scheme.OnSurface);
+    if (!tab.active &&  s_ena) TRY_SET(tab.fg, COLOR.Scheme.OnSurfaceVariant);
+    if (!tab.active && !s_ena) TRY_SET(tab.fg, COLOR.Scheme.OnSurface);
+
+    tab.icon_size = md_dp2px_ctx(ctx, 24*1.5);
+    tab.font_size = md_dp2px_ctx(ctx, md_pt2dp_ctx(ctx, 14));
+    tab.text_size = ctx->measure_text(tab.text, tab.font_size);
+
+    tab.box.h = md_dp2px_ctx(ctx, 48);
+    if (tab.icon_code != 0 && a_sta) tab.box.h = md_dp2px_ctx(ctx, 64);
+
+    if (tab.box.w == 0) {
+        tab.box.w = tab.box.h + tab.text_size.x;
+        if (tab.icon_code != 0 && a_inl) tab.box.w += md_dp2px_ctx(ctx, 24 + 8);
+    }
+
+    return tab;
+    #undef TRY_SET
+    // }}}
+}
+
+bool md_render_tab(MDTab tab) { return md_render_tab_ctx(&CTX, tab); }
+bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
+    // {{{
+    #define APPEND(CMD) md_ctx_append_ctx(ctx, (CMD)); (CMD)=(MDCommand){0}
+    MDCommand cmd = {0};
+
+    f32 dp = md_dp2px_ctx(ctx, 1);
+
+    // background
+    cmd.type = MD_COMMAND_DRAW_BOX;
+    cmd.as.box.box = tab.box;
+    cmd.as.box.color = tab.bg;
+    APPEND(cmd);
+
+    // state layer
+    if (tab.state_layer > 0) {
+        cmd.type = MD_COMMAND_DRAW_BOX;
+        cmd.as.box.box = tab.box;
+        cmd.as.box.color = tab.fg;
+        cmd.as.box.color.a = tab.state_layer;
+        APPEND(cmd);
+    }
+
+    // text & icon
+    if (tab.icon_code == 0) {
+        cmd.type = MD_COMMAND_DRAW_TEXT;
+        cmd.as.text.text = tab.text;
+        cmd.as.text.color = tab.fg;
+        cmd.as.text.font_size = tab.font_size;
+        cmd.as.text.box.x = tab.box.x + (tab.box.w - tab.text_size.x)/2.0;
+        cmd.as.text.box.y = tab.box.y + (tab.box.h - tab.text_size.y)/2.0;
+        APPEND(cmd);
+    } else {
+        f32 gap = 4*dp;
+
+        cmd.type = MD_COMMAND_DRAW_ICON;
+        cmd.as.icon.codepoint = tab.icon_code;
+        cmd.as.icon.color = tab.fg;
+        cmd.as.icon.icon_size = tab.icon_size;
+        cmd.as.icon.box.x = tab.box.x + (tab.box.w - tab.text_size.x)/2.0;
+        cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.icon_size)/2.0;
+        if (tab.icon_align == MD_TAB_ICON_ALIGN_STACKED) {
+            cmd.as.icon.box.x = tab.box.x + (tab.box.w - tab.icon_size)/2.0;
+            cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.icon_size - tab.text_size.y)/2.0;
+        } else {
+            cmd.as.icon.box.x = tab.box.x + (tab.box.w - tab.icon_size - tab.text_size.x - gap)/2.0;
+            cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.icon_size)/2.0;
+        }
+        APPEND(cmd);
+
+        cmd.type = MD_COMMAND_DRAW_TEXT;
+        cmd.as.text.text = tab.text;
+        cmd.as.text.color = tab.fg;
+        cmd.as.text.font_size = tab.font_size;
+        if (tab.icon_align == MD_TAB_ICON_ALIGN_STACKED) {
+            cmd.as.text.box.x = tab.box.x + (tab.box.w - tab.text_size.x)/2.0;
+            cmd.as.text.box.y = tab.box.y + (tab.box.h + tab.icon_size - tab.text_size.y)/2.0;
+            if (tab.state == MD_TAB_STATE_FOCUSED) cmd.as.text.box.y -= 3*dp;
+        } else {
+            cmd.as.icon.box.x = tab.box.x + (tab.box.w + tab.icon_size - tab.text_size.x + gap)/2.0;
+            cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.text_size.y)/2.0;
+        }
+        APPEND(cmd);
+    }
+
+    // focus
+    if (tab.state == MD_TAB_STATE_FOCUSED) {
+        f32 offset = 3*dp;
+        if (tab.active) {
+            if (tab.type == MD_TAB_TYPE_PRIMARY) {
+                offset += 3*dp;
+            } else {
+                offset += 2*dp;
+            }
+        }
+        f32 thickness = 2*dp;
+        f32 roundness = 8*dp; // probably
+        cmd.type = MD_COMMAND_DRAW_OUTLINE;
+        cmd.as.outline.box = tab.box;
+        cmd.as.outline.box.x += dp;
+        cmd.as.outline.box.y += dp;
+        cmd.as.outline.box.w -= 2*dp;
+        cmd.as.outline.box.h -= offset;
+        cmd.as.outline.color = COLOR.Scheme.OnSurfaceVariant; // probably
+        cmd.as.outline.round.tl = roundness;
+        cmd.as.outline.round.tr = roundness;
+        cmd.as.outline.round.bl = roundness;
+        cmd.as.outline.round.br = roundness;
+        cmd.as.outline.thickness = thickness;
+        APPEND(cmd);
+    }
+
+    // active indicator
+    if (tab.active) {
+        cmd.type = MD_COMMAND_DRAW_BOX;
+        cmd.as.box.box = tab.box;
+        cmd.as.box.box.y += cmd.as.box.box.h - 2*dp;
+        cmd.as.box.box.h = 2*dp;
+        if (tab.type == MD_TAB_TYPE_PRIMARY) {
+            cmd.as.box.box.y -= dp;
+            cmd.as.box.box.h += dp;
+            cmd.as.box.round.tl = 3*dp;
+            cmd.as.box.round.tr = 3*dp;
+            cmd.as.box.round.bl = 0;
+            cmd.as.box.round.br = 0;
+            cmd.as.box.box.w = tab.text_size.x - 2*dp;
+            if (tab.icon_code != 0 && tab.icon_align == MD_TAB_ICON_ALIGN_INLINED) {
+                cmd.as.box.box.w += tab.icon_size + 4*dp;
+            }
+            cmd.as.box.box.w = MAX(cmd.as.box.box.w, 24*dp);
+        }
+        cmd.as.box.box.x += (tab.box.w - cmd.as.box.box.w) / 2.0;
+        cmd.as.box.color = COLOR.Scheme.Primary;
+        APPEND(cmd);
+    }
+
+    // divider
+    cmd.type = MD_COMMAND_DRAW_BOX;
+    cmd.as.box.box = tab.box;
+    cmd.as.box.box.y += cmd.as.box.box.h - dp;
+    cmd.as.box.box.h = dp;
+    cmd.as.box.color = COLOR.Scheme.OutlineVariant;
+    APPEND(cmd);
+
+    return true;
+    #undef APPEND
+    // }}}
+}
+
+
 // DP = PX * 160 / DPI
 f32 md_px2dp(f32 px) { return md_px2dp_ctx(&CTX, px); }
 f32 md_px2dp_ctx(MDContext* ctx, f32 px) {
-    return (f32)px / (ctx->scaling_factor * ctx->ppi/160.0f);
+    return (f32)px / (ctx->scaling * ctx->ppi/160.0f);
 }
 
 // PX = DP * DPI / 160
 f32 md_dp2px(f32 dp) { return md_dp2px_ctx(&CTX, dp); }
 f32 md_dp2px_ctx(MDContext* ctx, f32 dp) {
-    return (f32)(0.5 + dp * (ctx->scaling_factor * ctx->ppi/160.0f)); // +0.5 to round
+    return (f32)(0.5 + dp * (ctx->scaling * ctx->ppi/160.0f)); // +0.5 to round
 }
 
 // DP = PT * 160 / 72

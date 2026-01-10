@@ -5,8 +5,7 @@
 
 #define RL(C) (Color){(C).r,(C).g,(C).b,(C).a}
 
-#define ROBOTO_FLEX "assets/Roboto/Flex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
-#define ROBOTO_CONDENSED "assets/Roboto/Condensed/static/RobotoCondensed-Regular.ttf"
+#define ROBOTO_FLEX "assets/RobotoFlex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
 static Font roboto;
 
 void DrawColorCard(const char* text, float x, float y, float w, float h, Color bg, Color textCol) {

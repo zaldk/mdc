@@ -9,7 +9,16 @@
 #define RL2(C,O) (Color){(C).r,(C).g,(C).b,(O)}
 
 #define ROBOTO_FLEX "assets/RobotoFlex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
-static Font roboto;
+#define ICONS_PATH "assets/MaterialSymbols/MaterialSymbolsRounded.ttf"
+static Font roboto, icons_font;
+
+#include "../assets/MaterialSymbols/MaterialSymbolsRounded.h"
+typedef struct {
+    i32 codepoint;
+    const char* name;
+} Icon;
+static Icon icons[MATERIAL_SYMBOLS_COUNT+1];
+static i32 icon_codepoints[MATERIAL_SYMBOLS_COUNT+1];
 
 void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr, MDColor bg) {
     // {{{
@@ -111,49 +120,15 @@ void DrawBoxRoundLines(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f3
     // }}}
 }
 
-MDSize BUTTON_SIZE = MD_SIZE_M;
 void DrawLayout() {
     // {{{
-    f32 max_width = 0;
-    f32 max_height = 0;
-    {
-        MDButton input = {0}; input.design = 0; input.state = 0; input.type = 0; input.size = BUTTON_SIZE;
-        input.text = "Unselected";
-        MDButton output = md_button(input);
-        max_width = output.box.w;
-        max_height = output.box.h;
-    }
-
-    f32 offset_x = 0;
-    for (u8 state = 0; state < 5; state++) {
-        f32 offset_y = 0;
-        for (u8 design = 0; design < 5; design++) {
-            f32 x = 20 + offset_x;
-            f32 y = 20 + offset_y;
-            if (design == 0) DrawTextEx(roboto, TextFormat("%d", state+1),    (Vector2){x-10+max_width/2, y-20}, 20, 0, COLOR.Scheme.OnBackground);
-            if (state  == 0) DrawTextEx(roboto, TextFormat("%c", design+'A'), (Vector2){x-15, y-20+max_height*(design==4?0.75:2.25)}, 20, 0, COLOR.Scheme.OnBackground);
-
-            f32 offset_z = 0;
-            for (u8 type = 0; type < 3; type++) {
-                if (design == MD_BUTTON_DESIGN_TEXT && type > 0) continue;
-                MDButton input = {0}; input.design = design; input.state = state; input.type = type; input.size = BUTTON_SIZE;
-                input.text = type == 0 ? "Default" : type == 1 ? "Unselected" : "Selected";
-                input.box.x = x;
-                input.box.y = y + offset_z;
-                input.box.w = max_width;
-                MDButton output = md_button(input);
-                md_render_button(output);
-                offset_z += output.box.h + 16;
-            }
-            offset_y += offset_z + 20;
-        }
-        offset_x += max_width + 20;
-    }
-
-    // DrawTextEx(roboto, "Button Reference", (Vector2){5, 0}, 20.0, 0.0, COLOR.Scheme.OnBackground);
-    DrawTextEx(roboto, "Press 1-5 To Change Button Sizes", (Vector2){5, GetScreenHeight()-80}, 20.0, 0.0, COLOR.Scheme.OnBackground);
-    DrawTextEx(roboto, "Styles (Y): A=Elevated | B=Filled | C=Tonal | D=Outline | E=Text", (Vector2){5, GetScreenHeight()-60}, 20.0, 0.0, COLOR.Scheme.OnBackground);
-    DrawTextEx(roboto, "States (X): 1=Default | 2=Disabled | 3=Hovered | 4=Focused | 5=Pressed", (Vector2){5, GetScreenHeight()-40}, 20.0, 0.0, COLOR.Scheme.OnBackground);
+    // MDButton input = {0}; input.design = design; input.state = state; input.type = type; input.size = BUTTON_SIZE;
+    // input.text = type == 0 ? "Default" : type == 1 ? "Unselected" : "Selected";
+    // input.box.x = x;
+    // input.box.y = y + offset_z;
+    // input.box.w = max_width;
+    // MDButton output = md_button(input);
+    // md_render_button(output);
     // }}}
 }
 
@@ -166,8 +141,8 @@ Vec2 measure_text_fn(char* text, f32 font_size_px) {
 int main(void) {
     md_color_global_init(true);
 
-    const int W = 650;
-    const int H = 900;
+    const int W = 800;
+    const int H = 600;
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN | FLAG_MSAA_4X_HINT);
     InitWindow(W, H, "FLOAT");
@@ -183,58 +158,40 @@ int main(void) {
     GenTextureMipmaps(&roboto.texture);
     SetTextureFilter(roboto.texture, TEXTURE_FILTER_TRILINEAR);
 
-    i32 dp = md_dp2px(10);
+    #define X(CP, ID, NAME) icons[ID] = (Icon){(CP), (#NAME)}; icon_codepoints[ID] = (CP);
+    MATERIAL_SYMBOLS
+    #undef X
+
+    icons_font = LoadFontEx(ICONS_PATH, 60, icon_codepoints, MATERIAL_SYMBOLS_COUNT);
+    GenTextureMipmaps(&icons_font.texture);
+    SetTextureFilter(icons_font.texture, TEXTURE_FILTER_TRILINEAR);
 
     while (!WindowShouldClose()) {
+        // {{{
         if (IsKeyPressed(KEY_SPACE)) md_color_global_switch_theme();
-        if (IsKeyPressed(KEY_ONE))   BUTTON_SIZE = MD_SIZE_XS;
-        if (IsKeyPressed(KEY_TWO))   BUTTON_SIZE = MD_SIZE_S;
-        if (IsKeyPressed(KEY_THREE)) BUTTON_SIZE = MD_SIZE_M;
-        if (IsKeyPressed(KEY_FOUR))  BUTTON_SIZE = MD_SIZE_L;
-        if (IsKeyPressed(KEY_FIVE))  BUTTON_SIZE = MD_SIZE_XL;
         BeginDrawing();
         ClearBackground(COLOR.Scheme.Background);
 
-        for (i32 y = 0; y < GetScreenHeight(); y += dp) {
-            for (i32 x = 0; x < GetScreenWidth(); x += dp) {
-                MDColor col = COLOR.Scheme.OnBackground;
-                col.a = 51;
-                DrawPixel(x, y, col);
+        const f32 icon_size = 20;
+        const i32 W = GetScreenWidth()/(i32)icon_size;
+        const i32 H = GetScreenHeight()/(i32)icon_size;
+        for (i32 y = 0; y < H; y++) {
+            for (i32 x = 0; x < W; x++) {
+                i32 index = y * W + x;
+                if (index >= MATERIAL_SYMBOLS_COUNT) goto out;
+                DrawTextCodepoint(icons_font, icons[index].codepoint, (Vector2){icon_size/2+icon_size*x, icon_size/2+icon_size*y}, icon_size, COLOR.Scheme.OnBackground);
             }
         }
+    out:
 
-        DrawLayout();
-        MDCommand cmd = {0};
-        int counter = 0;
-        while (md_ctx_poll(&cmd)) {
-            switch (cmd.type) {
-                case MD_COMMAND_DRAW_BOX: {
-                    MDBox box = cmd.as.box.box;
-                    MDCorners round = cmd.as.box.round;
-                    MDColor col = cmd.as.box.color;
-                    DrawBoxRound(box.x, box.y, box.w, box.h, round.tl, round.tr, round.bl, round.br, col);
-                }; break;
-                case MD_COMMAND_DRAW_OUTLINE: {
-                    MDBox box = cmd.as.outline.box;
-                    MDCorners round = cmd.as.outline.round;
-                    MDColor col = cmd.as.outline.color;
-                    f32 thickness = cmd.as.outline.thickness;
-                    DrawBoxRoundLines(box.x, box.y, box.w, box.h, round.tl, round.tr, round.bl, round.br, thickness, col);
-                }; break;
-                case MD_COMMAND_DRAW_TEXT: {
-                    MDBox box = cmd.as.text.box;
-                    MDColor col = cmd.as.text.color;
-                    DrawTextEx(roboto, cmd.as.text.text, (Vector2){box.x, box.y}, cmd.as.text.font_size, 0, col);
-                }; break;
-                default: UNREACHABLE();
-            }
-            counter++;
-        }
-
-        DrawTextEx(roboto, "Press 'Space' To Change Theme", (Vector2){5, GetScreenHeight()-20}, 20.0, 0.0, COLOR.Scheme.OnBackground);
+        // DrawTextEx(roboto, "Press 'Space' To Change Theme", (Vector2){5, GetScreenHeight()-20}, 20.0, 0.0, COLOR.Scheme.OnBackground);
         // DrawFPS(0,0);
         EndDrawing();
+        // }}}
     }
+
+    UnloadFont(icons_font);
+    UnloadFont(roboto);
     CloseWindow();
     return 0;
 }
