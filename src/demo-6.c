@@ -23,13 +23,19 @@ MDTabIconAlignment ALIGN = MD_TAB_ICON_ALIGN_STACKED;
 
 void DrawLayout() {
     // {{{
+    char num[2] = {'0', 0};
     f32 max_width = 100 * CTX.scaling;
     for (u8 state = 0; state < 4; state++) {
         f32 offset_x = 0;
         for (u8 active = 0; active < 2; active++) {
             u8 index = state * 2 + active;
-            f32 x = 50 + (f32)active * max_width * 2.25;
+            f32 x = 50 + (f32)active * max_width * 2.5;
             f32 y = 50 + (f32)state * 100.0;
+            if (active == 0) {
+                num[0] = state+1+'0';
+                DrawTextEx(ROBOTO, num, (Vector2){x-30, y+30}, 30.0, 0.0, COLOR.Scheme.OnBackground);
+            }
+
             MDTab input = {0};
             input.box = (MDBox){x, y, max_width, 0};
             input.state = state; input.active = active;
@@ -57,8 +63,13 @@ void DrawLayout() {
         f32 offset_x = 0;
         for (u8 active = 0; active < 2; active++) {
             u8 index = state * 2 + active;
-            f32 x = 50 + (f32)active * max_width * 2.25;
+            f32 x = 50 + (f32)active * max_width * 2.5;
             f32 y = 550 + (f32)state * 100.0;
+            if (active == 0) {
+                num[0] = state+1+'0';
+                DrawTextEx(ROBOTO, num, (Vector2){x-30, y+30}, 30.0, 0.0, COLOR.Scheme.OnBackground);
+            }
+
             MDTab input = {0};
             input.box = (MDBox){x, y, max_width, 0};
             input.state = state; input.active = active;
@@ -78,6 +89,10 @@ void DrawLayout() {
             offset_x += output.box.w;
         }
     }
+    DrawTextEx(ROBOTO, "Primary Inactive",   (Vector2){50+max_width *.5, 15}, 30.0, 0.0, COLOR.Scheme.OnBackground);
+    DrawTextEx(ROBOTO, "Primary Active",     (Vector2){50+max_width * 3, 15}, 30.0, 0.0, COLOR.Scheme.OnBackground);
+    DrawTextEx(ROBOTO, "Secondary Inactive", (Vector2){50+max_width *.5, 515}, 30.0, 0.0, COLOR.Scheme.OnBackground);
+    DrawTextEx(ROBOTO, "Secondary Active",   (Vector2){50+max_width * 3, 515}, 30.0, 0.0, COLOR.Scheme.OnBackground);
     // }}}
 }
 
@@ -162,6 +177,7 @@ int main(void) {
         }
 
         // DrawFPS(0,0);
+        DrawTextEx(ROBOTO, "State: 1=Enabled | 2=Hovered | 3=Focused | 4=Pressed", (Vector2){5, GetScreenHeight()-60}, 20.0, 0.0, COLOR.Scheme.OnBackground);
         DrawTextEx(ROBOTO, "Press 'Tab' To Change Icon Alignment", (Vector2){5, GetScreenHeight()-40}, 20.0, 0.0, COLOR.Scheme.OnBackground);
         DrawTextEx(ROBOTO, "Press 'Space' To Change Theme", (Vector2){5, GetScreenHeight()-20}, 20.0, 0.0, COLOR.Scheme.OnBackground);
         EndDrawing();
