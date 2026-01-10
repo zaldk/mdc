@@ -29,13 +29,13 @@ int main(int argc, char **argv) {
     if (argc == 0) {
         nob_log(NOB_INFO, "USAGE: %s N r?\n\tN - Number of the demo to build\n\tr - optional flag to run the built demo", nob_name);
         nob_log(NOB_INFO, "Available demos:\n\t"
-                "t - demo template - visually useless.\n\t"
                 "1 - color schemes\n\t"
                 "2 - all colors\n\t"
                 "3 - rounded rectangles\n\t"
                 "4 - buttons\n\t"
                 "5 - icons\n\t"
                 "6 - tabs\n\t"
+                "7 - interactive (basic, manual)\n\t"
                 );
         return 0;
     }
@@ -62,24 +62,6 @@ int main(int argc, char **argv) {
         char* arg_run = shift(argv, argc);
         if (arg_run != NULL && arg_run[0] == 'r') {
             cmd_append(&cmd, build_here);
-            if (!cmd_run(&cmd)) return 1;
-        }
-    }
-    if (arg_demo != NULL && arg_demo[0] == 't') {
-        nob_cc(&cmd);
-        cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=gnu99");
-        // cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
-        cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
-        cmd_append(&cmd, "-o", BUILD"demo-template.exe", SRC"demo-template.c");
-        cmd_append(&cmd, "-lm", "-l:libraylib.a");
-        if (!cmd_run(&cmd)) return 1;
-
-        nob_log(NOB_INFO, "Built Demo Template");
-        if (argc == 0) return 0;
-
-        char* arg_run = shift(argv, argc);
-        if (arg_run != NULL && arg_run[0] == 'r') {
-            cmd_append(&cmd, BUILD"demo-template.exe");
             if (!cmd_run(&cmd)) return 1;
         }
     }

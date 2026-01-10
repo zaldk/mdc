@@ -148,11 +148,14 @@ int main(void) {
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
 
-    Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(GetCurrentMonitor()), GetMonitorPhysicalHeight(GetCurrentMonitor())};
-    Vec2 monitor_resolution = (Vec2){GetMonitorWidth(GetCurrentMonitor()), GetMonitorHeight(GetCurrentMonitor())};
-    void* cmd_list_memory = calloc(MD_COMMANDS_MAXIMUM_QUANTITY, sizeof(MDCommand));
-    md_ctx_init(monitor_size, monitor_resolution, cmd_list_memory, measure_text_fn);
-    CTX.scaling = 1;
+    i32 mon = GetCurrentMonitor();
+    Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
+    Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
+    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    md_ctx_init(monitor_size, monitor_resolution);
+    md_ctx_set_scaling(1);
+    md_ctx_set_measure_text(measure_text_fn);
+    md_ctx_set_memory(cmd_list_memory);
 
     roboto = LoadFontEx(ROBOTO_FLEX, 60, NULL, 0);
     GenTextureMipmaps(&roboto.texture);

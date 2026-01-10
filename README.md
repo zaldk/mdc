@@ -52,3 +52,11 @@
 |-------------|--------------|
 | ![Dark Theme](images/demo_6_tabs_inline_dark.png) | ![Light Theme](images/demo_6_tabs_inline_light.png) |
 | ![Dark Theme](images/demo_6_tabs_stacked_dark.png) | ![Light Theme](images/demo_6_tabs_stacked_light.png) |
+
+---
+
+## Demo 7 - Interactive (Basic)
+
+| Dark Scheme | Light Scheme |
+|-------------|--------------|
+| ![Dark Theme](images/demo_7_basic_interaction_dark.png) | ![Light Theme](images/demo_7_basic_interaction_light.png) |

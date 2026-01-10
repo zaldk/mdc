@@ -183,15 +183,24 @@ typedef struct {
     } as;
 } MDCommand;
 
+MD_ENUM(u8, MDInputButton) {
+    MD_INPUT_LMB,
+    MD_INPUT_RMB,
+};
+
 typedef Vec2 (*MDMeasureTextFn)(char* text, f32 font_size_px);
+typedef Vec2 (*MDGetMousePositionFn)(void);
+typedef bool (*MDButtonDownFn)(MDInputButton button);
 
 typedef struct {
     Vec2 monitor_size_mm; // physical size, in mm
     Vec2 monitor_size_px; // width and height, in pixels
-    f32 scaling;   // default 1.0, used for in-app scaling.
     f32 ppi;              // pixels per inch
+    f32 scaling;          // default 1.0, used for in-app scaling.
 
-    MDMeasureTextFn measure_text; // required
+    MDMeasureTextFn measure_text;
+    MDGetMousePositionFn get_mouse;
+    MDButtonDownFn button_down;
 
     MDCommand* cmd_list; // must be at least MD_COMMANDS_MAXIMUM_QUANTITY
     u32 cmd_list_len;
@@ -199,10 +208,20 @@ typedef struct {
 } MDContext;
 static MDContext CTX = {0};
 
-void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px, void* cmd_list_memory, MDMeasureTextFn fn);
-void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px, void* cmd_list_memory, MDMeasureTextFn fn);
+void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px);
+void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px);
 void md_ctx_set_scaling(f32 scaling);
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling);
+void md_ctx_set_memory(void* cmd_list_memory);
+void md_ctx_set_memory_ctx(MDContext* ctx, void* cmd_list_memory);
+
+void md_ctx_set_measure_text(MDMeasureTextFn fn);
+void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn);
+void md_ctx_set_mouse_pos(MDGetMousePositionFn fn);
+void md_ctx_set_mouse_pos_ctx(MDContext* ctx, MDGetMousePositionFn fn);
+void md_ctx_set_button_down(MDButtonDownFn fn);
+void md_ctx_set_button_down_ctx(MDContext* ctx, MDButtonDownFn fn);
+
 bool md_ctx_append(MDCommand cmd);
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd);
 bool md_ctx_poll(MDCommand* cmd);
@@ -224,9 +243,8 @@ MD_ENUM(u8, MDButtonState) {
     MD_BUTTON_STATE_PRESSED,
 };
 MD_ENUM(u8, MDButtonType) {
-    MD_BUTTON_TYPE_DEFAULT,    // normal
-    MD_BUTTON_TYPE_UNSELECTED, // toggle - off
-    MD_BUTTON_TYPE_SELECTED,   // toggle - on
+    MD_BUTTON_TYPE_DEFAULT,
+    MD_BUTTON_TYPE_TOGGLE,
 };
 MD_ENUM(u8, MDButtonDesign) {
     MD_BUTTON_DESIGN_ELEVATED,
@@ -249,6 +267,7 @@ typedef struct {
     Vec2 text_size; // inferred
     MDColor fg;     // inferred
 
+    bool selected;         // required - only for toggle type
     MDButtonType type;     // required
     MDButtonState state;   // required
     MDButtonDesign design; // required
@@ -309,26 +328,38 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab);
 
 #ifdef MD_UI_IMPLEMENTATION /* {{{ */
 
-Vec2 empty_measure_text_fn(char* text, f32 font_size_px) { UNUSED(text); UNUSED(font_size_px); return (Vec2){0}; }
-
-void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px, void* cmd_list_memory, MDMeasureTextFn fn) {
-    md_ctx_init_ctx(&CTX, monitor_size_mm, monitor_size_px, cmd_list_memory, fn);
-}
-void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px, void* cmd_list_memory, MDMeasureTextFn fn) {
+void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px) { md_ctx_init_ctx(&CTX, monitor_size_mm, monitor_size_px); }
+void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px) {
     // {{{
     ctx->monitor_size_mm = monitor_size_mm;
     ctx->monitor_size_px = monitor_size_px;
-    ctx->scaling  = 1;
     ctx->ppi = monitor_size_px.x / (monitor_size_mm.x/25.4f);
-    ctx->measure_text = fn == NULL ? empty_measure_text_fn : fn;
+    ctx->scaling = 1;
+    // }}}
+}
+
+void md_ctx_set_memory(void* cmd_list_memory) { md_ctx_set_memory_ctx(&CTX, cmd_list_memory); }
+void md_ctx_set_memory_ctx(MDContext* ctx, void* cmd_list_memory) {
+    // {{{
+    if (cmd_list_memory == NULL) {
+        MD_ERROR("Memory cannot be NULL.");
+        UNREACHABLE();
+    }
     ctx->cmd_list = (MDCommand*)cmd_list_memory;
     // }}}
 }
 
 void md_ctx_set_scaling(f32 scaling) { md_ctx_set_scaling_ctx(&CTX, scaling); }
-void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling) {
-    ctx->scaling = scaling;
-}
+void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling) { ctx->scaling = scaling; }
+
+void md_ctx_set_measure_text(MDMeasureTextFn fn) { md_ctx_set_measure_text_ctx(&CTX, fn); }
+void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn) { ctx->measure_text = fn; }
+
+void md_ctx_set_mouse_pos(MDGetMousePositionFn fn) { md_ctx_set_mouse_pos_ctx(&CTX, fn); }
+void md_ctx_set_mouse_pos_ctx(MDContext* ctx, MDGetMousePositionFn fn) { ctx->get_mouse = fn; }
+
+void md_ctx_set_button_down(MDButtonDownFn fn) { md_ctx_set_button_down_ctx(&CTX, fn); }
+void md_ctx_set_button_down_ctx(MDContext* ctx, MDButtonDownFn fn) { ctx->button_down = fn; }
 
 bool md_ctx_append(MDCommand cmd) { return md_ctx_append_ctx(&CTX, cmd); }
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd) {
@@ -372,8 +403,6 @@ bool md_ctx_poll_ctx(MDContext* ctx, MDCommand* cmd) {
 MDButton md_button(MDButton button) { return md_button_ctx(&CTX, button); }
 MDButton md_button_ctx(MDContext* ctx, MDButton button) {
     // {{{
-    #define TRY_SET(var, col) (COLOR_UNSET(var) ? ((var) = (col), true) : (false))
-
     bool d_ele=0, d_fil=0, d_ton=0, d_out=0, d_txt=0;
     switch (button.design) {
         // {{{
@@ -398,12 +427,11 @@ MDButton md_button_ctx(MDContext* ctx, MDButton button) {
         // }}}
     }
 
-    bool t_def=0, t_uns=0, t_sel=0;
+    bool t_def=0, t_tog=0;
     switch (button.type) {
         // {{{
-        case MD_BUTTON_TYPE_DEFAULT:    t_def=1; break;
-        case MD_BUTTON_TYPE_UNSELECTED: t_uns=1; break;
-        case MD_BUTTON_TYPE_SELECTED:   t_sel=1; break;
+        case MD_BUTTON_TYPE_DEFAULT: t_def=1; break;
+        case MD_BUTTON_TYPE_TOGGLE:  t_tog=1; break;
         default: MD_ERROR("Unknown button type."); UNREACHABLE();
         // }}}
     }
@@ -423,17 +451,17 @@ MDButton md_button_ctx(MDContext* ctx, MDButton button) {
     u8 elevation = 0; // basically a shadow
     if (d_ele && (s_ena || s_pre)) elevation = 1;
     if (d_ele && (s_hov || s_foc)) elevation = 2;
-    if (d_fil && s_hov && (t_uns || t_sel)) elevation = 1;
+    if (d_fil && s_hov && t_tog) elevation = 1;
     if (d_ton && s_hov) elevation = 1;
     button.elevation = elevation;
 
     u8 state_layer = 0; // background shape, foreground color, with opacity=state_layer
-    if (s_hov) state_layer = (u8)(255.0*0.1); // should be 0.08
-    if (s_foc || s_pre) state_layer = (u8)(255.0*0.15); // should be 0.1
+    if (!s_dis && s_hov) state_layer = (u8)(255.0*0.1); // should be 0.08
+    if (!s_dis && (s_foc || s_pre)) state_layer = (u8)(255.0*0.15); // should be 0.1
     button.state_layer = state_layer;
 
     f32 corner_size = 1e6;
-    if (t_sel) {
+    if (t_tog && button.selected) {
         if (sz_xs || sz_s) corner_size = 12;
         if (sz_m)          corner_size = 16;
         if (sz_l || sz_xl) corner_size = 28;
@@ -458,13 +486,6 @@ MDButton md_button_ctx(MDContext* ctx, MDButton button) {
     if (sz_xl) font_size = 32;
     button.font_size = md_dp2px_ctx(ctx, md_pt2dp_ctx(ctx, font_size));
 
-    if (sz_xs) button.box.h =  32;
-    if (sz_s ) button.box.h =  40;
-    if (sz_m ) button.box.h =  56;
-    if (sz_l ) button.box.h =  96;
-    if (sz_xl) button.box.h = 136;
-    button.box.h = md_dp2px_ctx(ctx, button.box.h);
-
     f32 padding = 0; // dp
     if (sz_xs) padding = 12;
     if (sz_s ) padding = 16;
@@ -476,53 +497,57 @@ MDButton md_button_ctx(MDContext* ctx, MDButton button) {
     button.text_size = ctx->measure_text(button.text, button.font_size);
     button.box.w = MAX(button.box.w, padding*2 + button.text_size.x);
 
+    if (sz_xs) button.box.h =  32;
+    if (sz_s ) button.box.h =  40;
+    if (sz_m ) button.box.h =  56;
+    if (sz_l ) button.box.h =  96;
+    if (sz_xl) button.box.h = 136;
+    button.box.h = md_dp2px_ctx(ctx, button.box.h);
+
     if (s_dis) {
-        if (TRY_SET(button.bg, COLOR.Scheme.OnSurface)) {
-            button.bg.a = (u8)((f32)button.bg.a * 0.1);
-        }
-        if (TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant)) {
-            button.fg.a = (u8)((f32)button.fg.a * 0.4);
-        }
+        button.bg = COLOR.Scheme.OnSurface;
+        button.bg.a = (u8)((f32)button.bg.a * 0.1);
+        button.fg = COLOR.Scheme.OnSurfaceVariant;
+        button.fg.a = (u8)((f32)button.fg.a * 0.4);
     }
     if (d_ele) {
-        if (t_def) TRY_SET(button.bg, COLOR.Scheme.SurfaceContainerLow);
-        if (t_def) TRY_SET(button.fg, COLOR.Scheme.Primary);
-        if (t_uns) TRY_SET(button.bg, COLOR.Scheme.SurfaceContainerLow);
-        if (t_uns) TRY_SET(button.fg, COLOR.Scheme.Primary);
-        if (t_sel) TRY_SET(button.bg, COLOR.Scheme.Primary);
-        if (t_sel) TRY_SET(button.fg, COLOR.Scheme.OnPrimary);
+        if (t_def) button.bg = COLOR.Scheme.SurfaceContainerLow;
+        if (t_def) button.fg = COLOR.Scheme.Primary;
+        if (t_tog && !button.selected) button.bg = COLOR.Scheme.SurfaceContainerLow;
+        if (t_tog && !button.selected) button.fg = COLOR.Scheme.Primary;
+        if (t_tog &&  button.selected) button.bg = COLOR.Scheme.Primary;
+        if (t_tog &&  button.selected) button.fg = COLOR.Scheme.OnPrimary;
     }
     if (d_fil) {
-        if (t_def) TRY_SET(button.bg, COLOR.Scheme.Primary);
-        if (t_def) TRY_SET(button.fg, COLOR.Scheme.OnPrimary);
-        if (t_uns) TRY_SET(button.bg, COLOR.Scheme.SurfaceContainer);
-        if (t_uns) TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant);
-        if (t_sel) TRY_SET(button.bg, COLOR.Scheme.Primary);
-        if (t_sel) TRY_SET(button.fg, COLOR.Scheme.OnPrimary);
+        if (t_def) button.bg = COLOR.Scheme.Primary;
+        if (t_def) button.fg = COLOR.Scheme.OnPrimary;
+        if (t_tog && !button.selected) button.bg = COLOR.Scheme.SurfaceContainer;
+        if (t_tog && !button.selected) button.fg = COLOR.Scheme.OnSurfaceVariant;
+        if (t_tog &&  button.selected) button.bg = COLOR.Scheme.Primary;
+        if (t_tog &&  button.selected) button.fg = COLOR.Scheme.OnPrimary;
     }
     if (d_ton) {
-        if (t_def) TRY_SET(button.bg, COLOR.Scheme.SecondaryContainer);
-        if (t_def) TRY_SET(button.fg, COLOR.Scheme.OnSecondaryContainer);
-        if (t_uns) TRY_SET(button.bg, COLOR.Scheme.SecondaryContainer);
-        if (t_uns) TRY_SET(button.fg, COLOR.Scheme.OnSecondaryContainer);
-        if (t_sel) TRY_SET(button.bg, COLOR.Scheme.Secondary);
-        if (t_sel) TRY_SET(button.fg, COLOR.Scheme.OnSecondary);
+        if (t_def) button.bg = COLOR.Scheme.SecondaryContainer;
+        if (t_def) button.fg = COLOR.Scheme.OnSecondaryContainer;
+        if (t_tog && !button.selected) button.bg = COLOR.Scheme.SecondaryContainer;
+        if (t_tog && !button.selected) button.fg = COLOR.Scheme.OnSecondaryContainer;
+        if (t_tog &&  button.selected) button.bg = COLOR.Scheme.Secondary;
+        if (t_tog &&  button.selected) button.fg = COLOR.Scheme.OnSecondary;
     }
     if (d_out) {
-        if (t_def) TRY_SET(button.bg, COLOR.Scheme.OutlineVariant);
-        if (t_def) TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant);
-        if (t_uns) TRY_SET(button.bg, COLOR.Scheme.OutlineVariant);
-        if (t_uns) TRY_SET(button.fg, COLOR.Scheme.OnSurfaceVariant);
-        if (t_sel) TRY_SET(button.bg, COLOR.Scheme.InverseSurface);
-        if (t_sel) TRY_SET(button.fg, COLOR.Scheme.InverseOnSurface);
+        if (t_def) button.bg = COLOR.Scheme.OutlineVariant;
+        if (t_def) button.fg = COLOR.Scheme.OnSurfaceVariant;
+        if (t_tog && !button.selected) button.bg = COLOR.Scheme.OutlineVariant;
+        if (t_tog && !button.selected) button.fg = COLOR.Scheme.OnSurfaceVariant;
+        if (t_tog &&  button.selected) button.bg = COLOR.Scheme.InverseSurface;
+        if (t_tog &&  button.selected) button.fg = COLOR.Scheme.InverseOnSurface;
     }
     if (d_txt) {
-        if (t_def) TRY_SET(button.fg, COLOR.Scheme.Primary);
+        if (t_def) button.fg = COLOR.Scheme.Primary;
         if (!t_def) MD_WARN("Button Text Design Does Not Support Toggle.");
     }
 
     return button;
-    #undef TRY_SET
     // }}}
 }
 
@@ -540,9 +565,12 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
         thickness = md_dp2px_ctx(ctx, thickness);
         cmd.type = MD_COMMAND_DRAW_BOX;
         cmd.as.box.box = button.box;
-        if (i == 0) cmd.as.box.box.y -= thickness*0.5;
+        if (i == 0) {
+            cmd.as.box.box.y -= thickness*0.5;
+            cmd.as.box.box.h += thickness*0.5;
+        }
         cmd.as.box.box.x -= thickness*(0.5 + (f32)i*0.25);
-        cmd.as.box.box.w += thickness*(1 + (f32)i*0.5);
+        cmd.as.box.box.w += thickness*(1.0 + (f32)i*0.5);
         cmd.as.box.box.h += thickness*(1.5 + (f32)i*0.5);
         cmd.as.box.color = COLOR.Black;
         cmd.as.box.color.a = 51 * MIN(5, button.elevation);
@@ -551,7 +579,7 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
     }
 
     // background
-    if (button.type == MD_BUTTON_TYPE_SELECTED || button.state == MD_BUTTON_STATE_DISABLED || button.design != MD_BUTTON_DESIGN_OUTLINED) {
+    if (button.selected || button.state == MD_BUTTON_STATE_DISABLED || button.design != MD_BUTTON_DESIGN_OUTLINED) {
         cmd.type = MD_COMMAND_DRAW_BOX;
         cmd.as.box.box = button.box;
         cmd.as.box.color = button.bg;
@@ -570,7 +598,7 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
     }
 
     // outline
-    if (button.design == MD_BUTTON_DESIGN_OUTLINED && button.type != MD_BUTTON_TYPE_SELECTED) {
+    if (button.design == MD_BUTTON_DESIGN_OUTLINED && button.type == MD_BUTTON_TYPE_TOGGLE && !button.selected) {
         f32 thickness = 1;
         if (button.size == MD_SIZE_L) thickness = 2;
         if (button.size == MD_SIZE_XL) thickness = 3;
@@ -626,8 +654,6 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
 MDTab md_tab(MDTab tab) { return md_tab_ctx(&CTX, tab); }
 MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
     // {{{
-    #define TRY_SET(var, col) (COLOR_UNSET(var) ? ((var) = (col), true) : (false))
-
     bool t_pri=0, t_sec=0;
     switch (tab.type) {
         // {{{
@@ -657,30 +683,31 @@ MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
         // }}}
     }
 
-    if (s_hov) tab.state_layer = (u8)(255.0f*0.1f); // should be 0.08
-    if (s_pre || (s_foc && tab.active)) tab.state_layer = (u8)(255.0f*0.15f); // should be 0.1
+    u8 state_layer = 0;
+    if (s_hov) state_layer = (u8)(255.0f*0.1f); // should be 0.08
+    if (s_pre || (s_foc && tab.active)) state_layer = (u8)(255.0f*0.15f); // should be 0.1
+    tab.state_layer = state_layer;
 
-    TRY_SET(tab.bg, COLOR.Scheme.Surface);
+    tab.bg = COLOR.Scheme.Surface;
 
-    if ( tab.active &&  t_pri) TRY_SET(tab.fg, COLOR.Scheme.Primary);
-    if ( tab.active &&  t_sec) TRY_SET(tab.fg, COLOR.Scheme.OnSurface);
-    if (!tab.active &&  s_ena) TRY_SET(tab.fg, COLOR.Scheme.OnSurfaceVariant);
-    if (!tab.active && !s_ena) TRY_SET(tab.fg, COLOR.Scheme.OnSurface);
+    if ( tab.active &&  t_pri) tab.fg = COLOR.Scheme.Primary;
+    if ( tab.active &&  t_sec) tab.fg = COLOR.Scheme.OnSurface;
+    if (!tab.active &&  s_ena) tab.fg = COLOR.Scheme.OnSurfaceVariant;
+    if (!tab.active && !s_ena) tab.fg = COLOR.Scheme.OnSurface;
 
-    tab.icon_size = md_dp2px_ctx(ctx, 24*1.5);
+    tab.icon_size = md_dp2px_ctx(ctx, 24) * 1.5; // 1.5 to make it look slightly better, unsure what causes the problem
     tab.font_size = md_dp2px_ctx(ctx, md_pt2dp_ctx(ctx, 14));
     tab.text_size = ctx->measure_text(tab.text, tab.font_size);
 
-    tab.box.h = md_dp2px_ctx(ctx, 48);
+    tab.box.h = MAX(tab.box.h, md_dp2px_ctx(ctx, 48));
     if (tab.icon_code != 0 && a_sta) tab.box.h = md_dp2px_ctx(ctx, 64);
 
-    if (tab.box.w == 0) {
-        tab.box.w = tab.box.h + tab.text_size.x;
-        if (tab.icon_code != 0 && a_inl) tab.box.w += md_dp2px_ctx(ctx, 24 + 8);
-    }
+    f32 good_width = 0;
+    good_width = tab.box.h + tab.text_size.x;
+    if (tab.icon_code != 0 && a_inl) good_width += md_dp2px_ctx(ctx, 24 + 4);
+    tab.box.w = MAX(tab.box.w, good_width);
 
     return tab;
-    #undef TRY_SET
     // }}}
 }
 
@@ -741,7 +768,7 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
         if (tab.icon_align == MD_TAB_ICON_ALIGN_STACKED) {
             cmd.as.text.box.x = tab.box.x + (tab.box.w - tab.text_size.x)/2.0;
             cmd.as.text.box.y = tab.box.y + (tab.box.h + tab.icon_size - tab.text_size.y)/2.0;
-            if (tab.state == MD_TAB_STATE_FOCUSED) cmd.as.text.box.y -= 3*dp;
+            cmd.as.text.box.y -= 3*dp;
         } else {
             cmd.as.icon.box.x = tab.box.x + (tab.box.w + tab.icon_size - tab.text_size.x + gap)/2.0;
             cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.text_size.y)/2.0;
@@ -826,11 +853,12 @@ f32 md_dp2px_ctx(MDContext* ctx, f32 dp) {
     return (f32)(0.5 + dp * (ctx->scaling * ctx->ppi/160.0f)); // +0.5 to round
 }
 
-// DP = PT * 160 / 72
+// DP = PT * 160 / 96
+// PX = PT * DPI / 96
 f32 md_pt2dp(f32 pt) { return md_pt2dp_ctx(&CTX, pt); }
 f32 md_pt2dp_ctx(MDContext* ctx, f32 pt) {
     UNUSED(ctx);
-    return pt * 160.0f/72.0f * 0.66f;
+    return pt * 160.0f/96.0f * 0.66f;
 }
 
 /* Color Initialization Macro Magic {{{ */

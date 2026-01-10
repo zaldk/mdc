@@ -1,5 +1,6 @@
 #include <assert.h>
-#include <stdlib.h>
+
+#define TABS_COUNT 8
 
 #define TAB_ICON_LABELS \
     X(0, Search,	search) \
@@ -12,12 +13,12 @@
     X(7, Delete,	delete)
 
 #include "demo-helpers.h"
-static const char* TAB_LABELS[8] = {
+static const char* TAB_LABELS[TABS_COUNT] = {
     #define X(index, Name, name) #Name,
     TAB_ICON_LABELS
     #undef X
 };
-static i32 TAB_ICONS[8];
+static i32 TAB_ICONS[TABS_COUNT];
 
 MDTabIconAlignment ALIGN = MD_TAB_ICON_ALIGN_STACKED;
 
@@ -109,17 +110,22 @@ int main(void) {
     // SetTargetFPS(500);
     init_fonts(); // must be done AFTER InitWindow()
 
-    Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(GetCurrentMonitor()), GetMonitorPhysicalHeight(GetCurrentMonitor())};
-    Vec2 monitor_resolution = (Vec2){GetMonitorWidth(GetCurrentMonitor()), GetMonitorHeight(GetCurrentMonitor())};
-    void* cmd_list_memory = calloc(MD_COMMANDS_MAXIMUM_QUANTITY, sizeof(MDCommand));
-    md_ctx_init(monitor_size, monitor_resolution, cmd_list_memory, measure_text_fn);
+    i32 mon = GetCurrentMonitor();
+    Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
+    Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
+    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(2);
+    md_ctx_set_measure_text(measure_text_fn);
+    md_ctx_set_memory(cmd_list_memory);
 
     md_color_global_init(true);
 
-    #define X(index, Name, name) TAB_ICONS[index] = find_icon(#name);
-    TAB_ICON_LABELS
-    #undef X
+    TAB_ICONS[0] = find_icon("flight");
+    for (i32 i = 1; i < TABS_COUNT; i++) TAB_ICONS[i] = TAB_ICONS[0];
+    // #define X(index, Name, name) TAB_ICONS[index] = find_icon(#name);
+    // TAB_ICON_LABELS
+    // #undef X
 
     while (!WindowShouldClose()) {
         // {{{

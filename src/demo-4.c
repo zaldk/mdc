@@ -136,7 +136,9 @@ void DrawLayout() {
             f32 offset_z = 0;
             for (u8 type = 0; type < 3; type++) {
                 if (design == MD_BUTTON_DESIGN_TEXT && type > 0) continue;
-                MDButton input = {0}; input.design = design; input.state = state; input.type = type; input.size = BUTTON_SIZE;
+                MDButton input = {0}; input.design = design; input.state = state; input.size = BUTTON_SIZE;
+                input.type = type == 0 ? 0 : 1;
+                input.selected = type == 2;
                 input.text = type == 0 ? "Default" : type == 1 ? "Unselected" : "Selected";
                 input.box.x = x;
                 input.box.y = y + offset_z;
@@ -173,11 +175,14 @@ int main(void) {
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
 
-    Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(GetCurrentMonitor()), GetMonitorPhysicalHeight(GetCurrentMonitor())};
-    Vec2 monitor_resolution = (Vec2){GetMonitorWidth(GetCurrentMonitor()), GetMonitorHeight(GetCurrentMonitor())};
-    void* cmd_list_memory = calloc(MD_COMMANDS_MAXIMUM_QUANTITY, sizeof(MDCommand));
-    md_ctx_init(monitor_size, monitor_resolution, cmd_list_memory, measure_text_fn);
-    CTX.scaling = 1;
+    i32 mon = GetCurrentMonitor();
+    Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
+    Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
+    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    md_ctx_init(monitor_size, monitor_resolution);
+    md_ctx_set_scaling(1);
+    md_ctx_set_measure_text(measure_text_fn);
+    md_ctx_set_memory(cmd_list_memory);
 
     roboto = LoadFontEx(ROBOTO_FLEX, 60, NULL, 0);
     GenTextureMipmaps(&roboto.texture);
