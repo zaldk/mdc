@@ -151,11 +151,11 @@ int main(void) {
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
     Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
-    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    MDCommand cmd_list_memory[MD_COMMANDS_QUANTITY] = {0};
     md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(1);
     md_ctx_set_measure_text(measure_text_fn);
-    md_ctx_set_memory(cmd_list_memory);
+    md_ctx_set_memory_cmd(cmd_list_memory, MD_COMMANDS_QUANTITY);
 
     roboto = LoadFontEx(ROBOTO_FLEX, 60, NULL, 0);
     GenTextureMipmaps(&roboto.texture);

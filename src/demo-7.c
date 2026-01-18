@@ -4,22 +4,23 @@ static Vector2 MOUSE = {0};
 static bool MOUSE_DOWN = false;
 static bool MOUSE_PRESSED = false;
 
-static MDButton b_def = {0};
-static MDButton b_tog = {0};
+static MDCButton b_def = {0};
+static MDCButton b_tog = {0};
 
 #define TABS_COUNT 3
-static MDTab ptabs[TABS_COUNT] = {0};
-static MDTab stabs[TABS_COUNT] = {0};
+static MDCTab ptabs[TABS_COUNT] = {0};
+static MDCTab stabs[TABS_COUNT] = {0};
 
 void InitLayout(void) {
     // {{{
+
     b_def.box.x = 100;
     b_def.box.y = 100;
     b_def.design = MD_BUTTON_DESIGN_ELEVATED;
     b_def.type = MD_BUTTON_TYPE_DEFAULT;
     b_def.size = MD_SIZE_M;
     b_def.text = "Click Me!";
-    b_def = md_button(b_def);
+    b_def = mdc_button(b_def);
 
     b_tog.box.x = 100 + b_def.box.w + 100;
     b_tog.box.y = 100;
@@ -27,58 +28,58 @@ void InitLayout(void) {
     b_tog.type = MD_BUTTON_TYPE_TOGGLE;
     b_tog.size = MD_SIZE_M;
     b_tog.text = "Toggle Me!";
-    b_tog = md_button(b_tog);
+    b_tog = mdc_button(b_tog);
 
     // {{{ PTABS
     i32 icon_home = find_icon("home");
     ptabs[0].box.x = 100;
     ptabs[0].box.y = 100 + b_def.box.h + 100;
     ptabs[0].icon_code = icon_home;
-    ptabs[0].icon_align = MD_TAB_ICON_ALIGN_STACKED;
-    ptabs[0].type = MD_TAB_TYPE_PRIMARY;
+    ptabs[0].icon_align = MD_ICON_ALIGN_STACKED;
+    ptabs[0].type = MDC_TAB_TYPE_PRIMARY;
     ptabs[0].text = "Home";
-    ptabs[0] = md_tab(ptabs[0]);
+    ptabs[0] = mdc_tab(ptabs[0]);
 
     i32 icon_delete = find_icon("delete");
     ptabs[1].box.x = ptabs[0].box.x + ptabs[0].box.w;
     ptabs[1].box.y = 100 + b_def.box.h + 100;
     ptabs[1].icon_code = icon_delete;
-    ptabs[1].icon_align = MD_TAB_ICON_ALIGN_STACKED;
-    ptabs[1].type = MD_TAB_TYPE_PRIMARY;
+    ptabs[1].icon_align = MD_ICON_ALIGN_STACKED;
+    ptabs[1].type = MDC_TAB_TYPE_PRIMARY;
     ptabs[1].text = "Delete";
-    ptabs[1] = md_tab(ptabs[1]);
+    ptabs[1] = mdc_tab(ptabs[1]);
 
     i32 icon_inbox = find_icon("inbox");
     ptabs[2].box.x = ptabs[1].box.x + ptabs[1].box.w;
     ptabs[2].box.y = 100 + b_def.box.h + 100;
     ptabs[2].icon_code = icon_inbox;
-    ptabs[2].icon_align = MD_TAB_ICON_ALIGN_STACKED;
-    ptabs[2].type = MD_TAB_TYPE_PRIMARY;
+    ptabs[2].icon_align = MD_ICON_ALIGN_STACKED;
+    ptabs[2].type = MDC_TAB_TYPE_PRIMARY;
     ptabs[2].text = "Inbox";
-    ptabs[2] = md_tab(ptabs[2]);
+    ptabs[2] = mdc_tab(ptabs[2]);
     // }}}
 
     // {{{ STABS
     stabs[0].box.x = 100;
     stabs[0].box.y = 100 + b_def.box.h + 100 + ptabs[0].box.h;
     stabs[0].box.w = ptabs[0].box.w;
-    stabs[0].type = MD_TAB_TYPE_SECONDARY;
+    stabs[0].type = MDC_TAB_TYPE_SECONDARY;
     stabs[0].text = "Home";
-    stabs[0] = md_tab(stabs[0]);
+    stabs[0] = mdc_tab(stabs[0]);
 
     stabs[1].box.x = stabs[0].box.x + stabs[0].box.w;
     stabs[1].box.y = stabs[0].box.y;
     stabs[1].box.w = ptabs[1].box.w;
-    stabs[1].type = MD_TAB_TYPE_SECONDARY;
+    stabs[1].type = MDC_TAB_TYPE_SECONDARY;
     stabs[1].text = "Delete";
-    stabs[1] = md_tab(stabs[1]);
+    stabs[1] = mdc_tab(stabs[1]);
 
     stabs[2].box.x = stabs[1].box.x + stabs[1].box.w;
     stabs[2].box.y = stabs[0].box.y;
     stabs[2].box.w = ptabs[2].box.w;
-    stabs[2].type = MD_TAB_TYPE_SECONDARY;
+    stabs[2].type = MDC_TAB_TYPE_SECONDARY;
     stabs[2].text = "Inbox";
-    stabs[2] = md_tab(stabs[2]);
+    stabs[2] = mdc_tab(stabs[2]);
     // }}}
 
     // }}}
@@ -95,8 +96,8 @@ void DrawLayout() {
     } else {
         b_def.state = MD_BUTTON_STATE_ENABLED;
     }
-    b_def = md_button(b_def);
-    md_render_button(b_def);
+    b_def = mdc_button(b_def);
+    mdc_render_button(b_def);
 
     if (CheckCollisionPointRec(MOUSE, *(Rectangle*)&b_tog.box)) {
         if (MOUSE_PRESSED) {
@@ -111,8 +112,8 @@ void DrawLayout() {
     } else {
         b_tog.state = MD_BUTTON_STATE_ENABLED;
     }
-    b_tog = md_button(b_tog);
-    md_render_button(b_tog);
+    b_tog = mdc_button(b_tog);
+    mdc_render_button(b_tog);
 
     DrawBoxRound(
         ptabs[0].box.x-20,
@@ -123,50 +124,46 @@ void DrawLayout() {
         COLOR.Scheme.SurfaceContainerLow
     );
     for (i32 index = 0; index < TABS_COUNT; index++) {
-        MDTab* tab = &ptabs[index];
+        MDCTab* tab = &ptabs[index];
         if (CheckCollisionPointRec(MOUSE, *(Rectangle*)&(tab->box))) {
             if (MOUSE_PRESSED) {
-                tab->active = !tab->active;
-                if (tab->active) {
-                    for (i32 jndex = 0; jndex < TABS_COUNT; jndex++) {
-                        if (index != jndex) ptabs[jndex].active = false;
-                    }
+                for (i32 jndex = 0; jndex < TABS_COUNT; jndex++) {
+                    ptabs[jndex].active = false;
                 }
+                tab->active = true;
             } else {
                 if (MOUSE_DOWN) {
-                    tab->state = MD_TAB_STATE_PRESSED;
+                    tab->state = MDC_TAB_STATE_PRESSED;
                 } else {
-                    tab->state = MD_TAB_STATE_HOVERED;
+                    tab->state = MDC_TAB_STATE_HOVERED;
                 }
             }
         } else {
-            tab->state = MD_TAB_STATE_ENABLED;
+            tab->state = MDC_TAB_STATE_ENABLED;
         }
-        *tab = md_tab(*tab);
-        md_render_tab(*tab);
+        *tab = mdc_tab(*tab);
+        mdc_render_tab(*tab);
     }
     for (i32 index = 0; index < TABS_COUNT; index++) {
-        MDTab* tab = &stabs[index];
+        MDCTab* tab = &stabs[index];
         if (CheckCollisionPointRec(MOUSE, *(Rectangle*)&(tab->box))) {
             if (MOUSE_PRESSED) {
-                tab->active = !tab->active;
-                if (tab->active) {
-                    for (i32 jndex = 0; jndex < TABS_COUNT; jndex++) {
-                        if (index != jndex) stabs[jndex].active = false;
-                    }
+                for (i32 jndex = 0; jndex < TABS_COUNT; jndex++) {
+                    stabs[jndex].active = false;
                 }
+                tab->active = true;
             } else {
                 if (MOUSE_DOWN) {
-                    tab->state = MD_TAB_STATE_PRESSED;
+                    tab->state = MDC_TAB_STATE_PRESSED;
                 } else {
-                    tab->state = MD_TAB_STATE_HOVERED;
+                    tab->state = MDC_TAB_STATE_HOVERED;
                 }
             }
         } else {
-            tab->state = MD_TAB_STATE_ENABLED;
+            tab->state = MDC_TAB_STATE_ENABLED;
         }
-        *tab = md_tab(*tab);
-        md_render_tab(*tab);
+        *tab = mdc_tab(*tab);
+        mdc_render_tab(*tab);
     }
     // }}}
 }
@@ -183,17 +180,17 @@ int main(void) {
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
 
-    init_fonts(); // demo-helper; must be done AFTER InitWindow()
+    init_fonts(true); // demo-helper; must be done AFTER InitWindow()
     md_color_global_init(true);
 
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
     Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
-    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    MDCommand cmd_list_memory[MD_COMMANDS_QUANTITY] = {0};
     md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(2);
     md_ctx_set_measure_text(measure_text_fn);
-    md_ctx_set_memory(cmd_list_memory);
+    md_ctx_set_memory_cmd(cmd_list_memory, MD_COMMANDS_QUANTITY);
 
     InitLayout();
     while (!WindowShouldClose()) {

@@ -117,9 +117,9 @@ void DrawLayout() {
     f32 max_width = 0;
     f32 max_height = 0;
     {
-        MDButton input = {0}; input.design = 0; input.state = 0; input.type = 0; input.size = BUTTON_SIZE;
+        MDCButton input = {0}; input.design = 0; input.state = 0; input.type = 0; input.size = BUTTON_SIZE;
         input.text = "Unselected";
-        MDButton output = md_button(input);
+        MDCButton output = mdc_button(input);
         max_width = output.box.w;
         max_height = output.box.h;
     }
@@ -136,15 +136,15 @@ void DrawLayout() {
             f32 offset_z = 0;
             for (u8 type = 0; type < 3; type++) {
                 if (design == MD_BUTTON_DESIGN_TEXT && type > 0) continue;
-                MDButton input = {0}; input.design = design; input.state = state; input.size = BUTTON_SIZE;
+                MDCButton input = {0}; input.design = design; input.state = state; input.size = BUTTON_SIZE;
                 input.type = type == 0 ? 0 : 1;
                 input.selected = type == 2;
                 input.text = type == 0 ? "Default" : type == 1 ? "Unselected" : "Selected";
                 input.box.x = x;
                 input.box.y = y + offset_z;
                 input.box.w = max_width;
-                MDButton output = md_button(input);
-                md_render_button(output);
+                MDCButton output = mdc_button(input);
+                mdc_render_button(output);
                 offset_z += output.box.h + 16;
             }
             offset_y += offset_z + 20;
@@ -178,11 +178,11 @@ int main(void) {
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
     Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
-    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    MDCommand cmd_list_memory[MD_COMMANDS_QUANTITY] = {0};
     md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(1);
     md_ctx_set_measure_text(measure_text_fn);
-    md_ctx_set_memory(cmd_list_memory);
+    md_ctx_set_memory_cmd(cmd_list_memory, MD_COMMANDS_QUANTITY);
 
     roboto = LoadFontEx(ROBOTO_FLEX, 60, NULL, 0);
     GenTextureMipmaps(&roboto.texture);

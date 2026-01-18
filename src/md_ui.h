@@ -33,6 +33,10 @@ typedef double      f64;
 #define UNUSED(X) ((void)X)
 #define UNREACHABLE(S) assert(0 && (#S))
 
+#define MD_COMMANDS_QUANTITY 1024
+#define MD_ELEMENTS_QUANTITY 1024
+#define MD_ELEMENT_NIL (-1)
+
 #include <stdio.h>
 #define MD_PRINTF printf
 #ifdef NO_LOGGING
@@ -141,18 +145,19 @@ void md_color_global_switch_theme();
 typedef struct { f32 x, y, w, h; } MDBox;
 typedef struct { f32 tl, tr, bl, br; } MDCorners;
 
-MD_ENUM(u8, MDAlign) { MD_ALIGN_START, MD_ALIGN_CENTER, MD_ALIGN_END, };
+MD_ENUM(u8, MDAlign) { MD_ALIGN_START=0, MD_ALIGN_CENTER=1, MD_ALIGN_END=2 };
 typedef struct { MDAlign x, y; } MDTextAlign;
 
-MD_ENUM(u8, MDSize) { MD_SIZE_XS, MD_SIZE_S, MD_SIZE_M, MD_SIZE_L, MD_SIZE_XL, };
+MD_ENUM(u8, MDSize) { MD_SIZE_XS=1, MD_SIZE_S=2, MD_SIZE_M=0, MD_SIZE_L=3, MD_SIZE_XL=4 };
+MD_ENUM(u8, MDIconAlign) { MD_ICON_ALIGN_INLINED=0, MD_ICON_ALIGN_STACKED=1 };
 
-#define MD_COMMANDS_MAXIMUM_QUANTITY 1024
+// {{{ MDCommand
 typedef u8 MDCommandType; enum {
-    MD_COMMAND_DRAW_NONE,
-    MD_COMMAND_DRAW_BOX,
-    MD_COMMAND_DRAW_OUTLINE,
-    MD_COMMAND_DRAW_TEXT,
-    MD_COMMAND_DRAW_ICON,
+    MD_COMMAND_DRAW_NONE    = 0,
+    MD_COMMAND_DRAW_BOX     = 1,
+    MD_COMMAND_DRAW_OUTLINE = 2,
+    MD_COMMAND_DRAW_TEXT    = 3,
+    MD_COMMAND_DRAW_ICON    = 4,
 };
 typedef struct {
     MDCommandType type;
@@ -182,16 +187,20 @@ typedef struct {
         } icon;
     } as;
 } MDCommand;
+// }}}
 
 MD_ENUM(u8, MDInputButton) {
-    MD_INPUT_LMB,
-    MD_INPUT_RMB,
+    MD_INPUT_LMB = 0,
+    MD_INPUT_RMB = 1,
 };
 
 typedef Vec2 (*MDMeasureTextFn)(char* text, f32 font_size_px);
 typedef Vec2 (*MDGetMousePositionFn)(void);
-typedef bool (*MDButtonDownFn)(MDInputButton button);
+typedef bool (*MDCButtonDownFn)(MDInputButton button);
 
+typedef struct MDElement MDElement; // C sux, see below
+
+// {{{ MDContext
 typedef struct {
     Vec2 monitor_size_mm; // physical size, in mm
     Vec2 monitor_size_px; // width and height, in pixels
@@ -200,27 +209,37 @@ typedef struct {
 
     MDMeasureTextFn measure_text;
     MDGetMousePositionFn get_mouse;
-    MDButtonDownFn button_down;
+    MDCButtonDownFn button_down;
 
-    MDCommand* cmd_list; // must be at least MD_COMMANDS_MAXIMUM_QUANTITY
-    u32 cmd_list_len;
-    u32 cmd_list_poll_index;
+    // Drawing Commands Buffer
+    MDCommand* cmds; // recommended be at least MD_COMMANDS_QUANTITY
+    i32 cmds_cap;
+    i32 cmds_len;
+    i32 cmds_poll_index; // internal use only
+
+    // Layout Components Buffer
+    MDElement* elems; // recommended be at least MD_COMPONENTS_QUANTITY
+    i32 elems_cap;
+    i32 elems_len;
 } MDContext;
 static MDContext CTX = {0};
+// }}}
 
 void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px);
 void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px);
 void md_ctx_set_scaling(f32 scaling);
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling);
-void md_ctx_set_memory(void* cmd_list_memory);
-void md_ctx_set_memory_ctx(MDContext* ctx, void* cmd_list_memory);
+void md_ctx_set_memory_cmd(void* memory, i32 count);
+void md_ctx_set_memory_cmd_ctx(MDContext* ctx, void* memory, i32 count);
+void md_ctx_set_memory_elem(void* memory, i32 count);
+void md_ctx_set_memory_elem_ctx(MDContext* ctx, void* memory, i32 count);
 
 void md_ctx_set_measure_text(MDMeasureTextFn fn);
 void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn);
 void md_ctx_set_mouse_pos(MDGetMousePositionFn fn);
 void md_ctx_set_mouse_pos_ctx(MDContext* ctx, MDGetMousePositionFn fn);
-void md_ctx_set_button_down(MDButtonDownFn fn);
-void md_ctx_set_button_down_ctx(MDContext* ctx, MDButtonDownFn fn);
+void md_ctx_set_button_down(MDCButtonDownFn fn);
+void md_ctx_set_button_down_ctx(MDContext* ctx, MDCButtonDownFn fn);
 
 bool md_ctx_append(MDCommand cmd);
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd);
@@ -234,93 +253,143 @@ f32 md_dp2px_ctx(MDContext* ctx, f32 dp);
 f32 md_pt2dp(f32 pt);
 f32 md_pt2dp_ctx(MDContext* ctx, f32 pt);
 
+// {{{ MDCDiv
+typedef struct {
+    MDBox box; // X,Y - required; W,H - inferred;
+} MDCDiv;
+// }}}
+
+MDCDiv mdc_div(MDCDiv div);
+MDCDiv mdc_div_ctx(MDContext* ctx, MDCDiv div);
+bool mdc_render_div(MDCDiv div);
+bool mdc_render_div_ctx(MDContext* ctx, MDCDiv div);
+// #define mdl_div(...) mdc_div((MDCDiv){__VA_ARGS__})
+// #define mdl_div_ctx(ctx, ...) mdc_div_ctx((ctx), (MDCDiv){__VA_ARGS__})
+
 /* https://m3.material.io/components/buttons/overview */
-MD_ENUM(u8, MDButtonState) {
-    MD_BUTTON_STATE_ENABLED,
-    MD_BUTTON_STATE_DISABLED,
-    MD_BUTTON_STATE_HOVERED,
-    MD_BUTTON_STATE_FOCUSED,
-    MD_BUTTON_STATE_PRESSED,
+// {{{ MDCButton
+MD_ENUM(u8, MDCButtonState) {
+    MD_BUTTON_STATE_ENABLED  = 0,
+    MD_BUTTON_STATE_DISABLED = 1,
+    MD_BUTTON_STATE_HOVERED  = 2,
+    MD_BUTTON_STATE_FOCUSED  = 3,
+    MD_BUTTON_STATE_PRESSED  = 4,
 };
-MD_ENUM(u8, MDButtonType) {
-    MD_BUTTON_TYPE_DEFAULT,
-    MD_BUTTON_TYPE_TOGGLE,
+MD_ENUM(u8, MDCButtonType) {
+    MD_BUTTON_TYPE_DEFAULT = 0,
+    MD_BUTTON_TYPE_TOGGLE  = 1,
 };
-MD_ENUM(u8, MDButtonDesign) {
-    MD_BUTTON_DESIGN_ELEVATED,
-    MD_BUTTON_DESIGN_FILLED,
-    MD_BUTTON_DESIGN_TONAL,
-    MD_BUTTON_DESIGN_OUTLINED,
-    MD_BUTTON_DESIGN_TEXT,
+MD_ENUM(u8, MDCButtonDesign) {
+    MD_BUTTON_DESIGN_ELEVATED = 0,
+    MD_BUTTON_DESIGN_FILLED   = 1,
+    MD_BUTTON_DESIGN_TONAL    = 2,
+    MD_BUTTON_DESIGN_OUTLINED = 3,
+    MD_BUTTON_DESIGN_TEXT     = 4,
 };
 typedef void(*MDCallbackButton)(void);
 typedef struct {
-    MDBox box;       // X,Y - required; W,H - optional;
-    MDSize size;     // required
-    MDCorners round; // inferred
+    MDBox box;              // X,Y - required; W,H - inferred;
+    MDSize size;            // required
+    char* text;             // required
+    MDCButtonType type;     // required
+    MDCButtonState state;   // required
+    MDCButtonDesign design; // required
+    bool selected;          // required - only for toggle type
+
+    i32 icon_code;          // optional // TODO
+    MDIconAlign icon_align; // optional // TODO
+    MDCallbackButton cb;    // optional
+
     MDColor bg;      // inferred
+    MDColor fg;      // inferred
+    MDCorners round; // inferred
+    f32 font_size;   // inferred
+    Vec2 text_size;  // inferred
     u8 state_layer;  // inferred
     u8 elevation;    // inferred
+} MDCButton;
+// }}}
 
-    char* text;     // required
-    f32 font_size;  // inferred
-    Vec2 text_size; // inferred
-    MDColor fg;     // inferred
+MDCButton mdc_button(MDCButton button);
+MDCButton mdc_button_ctx(MDContext* ctx, MDCButton button);
+bool mdc_render_button(MDCButton button);
+bool mdc_render_button_ctx(MDContext* ctx, MDCButton button);
+// #define mdl_button(...) mdc_button((MDCButton){__VA_ARGS__})
+// #define mdl_button_ctx(ctx, ...) mdc_button_ctx((ctx), (MDCButton){__VA_ARGS__})
 
-    bool selected;         // required - only for toggle type
-    MDButtonType type;     // required
-    MDButtonState state;   // required
-    MDButtonDesign design; // required
-
-    MDCallbackButton cb; // optional
-} MDButton;
-
-// When some info is omitted, the functions will fill it in and return the object back.
-MDButton md_button(MDButton button);
-MDButton md_button_ctx(MDContext* ctx, MDButton button);
-// These will "render" the objects into Context by appending draw commands.
-bool md_render_button(MDButton button);
-bool md_render_button_ctx(MDContext* ctx, MDButton button);
-
-MD_ENUM(u8, MDTabType) {
-    MD_TAB_TYPE_PRIMARY,
-    MD_TAB_TYPE_SECONDARY,
+// {{{ MDCTab
+MD_ENUM(u8, MDCTabType) {
+    MDC_TAB_TYPE_PRIMARY   = 0,
+    MDC_TAB_TYPE_SECONDARY = 1,
 };
-MD_ENUM(u8, MDTabState) {
-    MD_TAB_STATE_ENABLED,
-    MD_TAB_STATE_HOVERED,
-    MD_TAB_STATE_FOCUSED,
-    MD_TAB_STATE_PRESSED,
-};
-MD_ENUM(u8, MDTabIconAlignment) {
-    MD_TAB_ICON_ALIGN_INLINED,
-    MD_TAB_ICON_ALIGN_STACKED,
+MD_ENUM(u8, MDCTabState) {
+    MDC_TAB_STATE_ENABLED = 0,
+    MDC_TAB_STATE_HOVERED = 1,
+    MDC_TAB_STATE_FOCUSED = 2,
+    MDC_TAB_STATE_PRESSED = 3,
 };
 typedef void(*MDCallbackTab)(void);
 typedef struct {
-    MDBox box;      // X,Y,W - required; H - inferred;
-    MDColor bg;     // inferred
-    u8 state_layer; // inferred
+    MDBox box;         // X,Y - required; W,H - inferred;
+    char* text;        // required
+    MDCTabType type;   // required
+    MDCTabState state; // required
+    bool active;       // required
 
-    char* text;     // required
+    i32 icon_code;          // optional
+    MDIconAlign icon_align; // optional
+    MDCallbackTab cb;       // optional
+
+    MDColor bg;     // inferred from type/state
+    MDColor fg;     // inferred from type/state
+    u8 state_layer; // inferred from state
     f32 font_size;  // inferred
-    Vec2 text_size; // inferred
-    MDColor fg;     // inferred
-    i32 icon_code;  // optional
     f32 icon_size;  // inferred
-    MDTabIconAlignment icon_align; // optional
+    Vec2 text_size; // inferred from text
+} MDCTab;
+// }}}
 
-    MDTabType type;   // required
-    MDTabState state; // required
-    bool active;      // required
+MDCTab mdc_tab(MDCTab tab);
+MDCTab mdc_tab_ctx(MDContext* ctx, MDCTab tab);
+bool mdc_render_tab(MDCTab tab);
+bool mdc_render_tab_ctx(MDContext* ctx, MDCTab tab);
+// #define mdl_tab(...) mdc_tab((MDCTab){__VA_ARGS__})
+// #define mdl_tab_ctx(ctx, ...) mdc_tab_ctx((ctx), (MDCTab){__VA_ARGS__})
 
-    MDCallbackTab cb; // optional
-} MDTab;
+// {{{ MDComponent
+MD_ENUM(u8, MDComponentType) {
+    MDC_DIV    = 0,
+    MDC_BUTTON = 1,
+    MDC_TAB    = 2,
+};
+typedef struct MDComponent {
+    MDComponentType type;
+    union {
+        MDCDiv div;
+        MDCButton button;
+        MDCTab tab;
+    } as;
+} MDComponent;
+// }}}
 
-MDTab md_tab(MDTab tab);
-MDTab md_tab_ctx(MDContext* ctx, MDTab tab);
-bool md_render_tab(MDTab tab);
-bool md_render_tab_ctx(MDContext* ctx, MDTab tab);
+MDComponent mdc_component(MDComponent component);
+MDComponent mdc_component_ctx(MDContext* ctx, MDComponent component);
+bool mdc_render_component(MDComponent component);
+bool mdc_render_component_ctx(MDContext* ctx, MDComponent component);
+// #define mdl_component(...) mdc_component((MDComponent){__VA_ARGS__})
+// #define mdl_component_ctx(ctx, ...) mdc_component_ctx((ctx), (MDComponent){__VA_ARGS__})
+
+// {{{ MDElement
+struct MDElement {
+    MDComponent comp;
+    i32 parent;
+    i32 child_first, child_last; // for performance reasons, the LL is made in reversed order
+    i32 sibling_next, sibling_prev;
+};
+// }}}
+
+i32 mdl_element_add(MDComponent comp, i32 parent_index);
+i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index);
 
 #endif /* MD_UI }}} */
 
@@ -338,14 +407,29 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
     // }}}
 }
 
-void md_ctx_set_memory(void* cmd_list_memory) { md_ctx_set_memory_ctx(&CTX, cmd_list_memory); }
-void md_ctx_set_memory_ctx(MDContext* ctx, void* cmd_list_memory) {
+void md_ctx_set_memory_cmd(void* memory, i32 count) { md_ctx_set_memory_cmd_ctx(&CTX, memory, count); }
+void md_ctx_set_memory_cmd_ctx(MDContext* ctx, void* memory, i32 count) {
     // {{{
-    if (cmd_list_memory == NULL) {
+    if (memory == NULL) {
         MD_ERROR("Memory cannot be NULL.");
         UNREACHABLE();
     }
-    ctx->cmd_list = (MDCommand*)cmd_list_memory;
+    ctx->cmds = (MDCommand*)memory;
+    ctx->cmds_cap = count;
+    ctx->cmds_len = 0;
+    // }}}
+}
+
+void md_ctx_set_memory_elem(void* memory, i32 count) { md_ctx_set_memory_elem_ctx(&CTX, memory, count); }
+void md_ctx_set_memory_elem_ctx(MDContext* ctx, void* memory, i32 count) {
+    // {{{
+    if (memory == NULL) {
+        MD_ERROR("Memory cannot be NULL.");
+        UNREACHABLE();
+    }
+    ctx->elems = (MDElement*)memory;
+    ctx->elems_cap = count;
+    ctx->elems_len = 0;
     // }}}
 }
 
@@ -358,23 +442,23 @@ void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn) { ctx->meas
 void md_ctx_set_mouse_pos(MDGetMousePositionFn fn) { md_ctx_set_mouse_pos_ctx(&CTX, fn); }
 void md_ctx_set_mouse_pos_ctx(MDContext* ctx, MDGetMousePositionFn fn) { ctx->get_mouse = fn; }
 
-void md_ctx_set_button_down(MDButtonDownFn fn) { md_ctx_set_button_down_ctx(&CTX, fn); }
-void md_ctx_set_button_down_ctx(MDContext* ctx, MDButtonDownFn fn) { ctx->button_down = fn; }
+void md_ctx_set_button_down(MDCButtonDownFn fn) { md_ctx_set_button_down_ctx(&CTX, fn); }
+void md_ctx_set_button_down_ctx(MDContext* ctx, MDCButtonDownFn fn) { ctx->button_down = fn; }
 
 bool md_ctx_append(MDCommand cmd) { return md_ctx_append_ctx(&CTX, cmd); }
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd) {
     // {{{
-    if (ctx->cmd_list == NULL) {
-        MD_ERROR("Context memory not initialized.");
+    if (ctx->cmds == NULL) {
+        MD_ERROR("Context memory (commands) not initialized.");
         UNREACHABLE();
         return false;
     }
-    if (ctx->cmd_list_len >= MD_COMMANDS_MAXIMUM_QUANTITY) {
-        MD_ERROR("Context memory was not big enough.");
+    if (ctx->cmds_len >= ctx->cmds_cap) {
+        MD_ERROR("Context memory (commands) was not big enough.");
         UNREACHABLE();
         return false;
     }
-    ctx->cmd_list[ctx->cmd_list_len++] = cmd;
+    ctx->cmds[ctx->cmds_len++] = cmd;
     return true;
     // }}}
 }
@@ -382,26 +466,45 @@ bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd) {
 bool md_ctx_poll(MDCommand* cmd) { return md_ctx_poll_ctx(&CTX, cmd); }
 bool md_ctx_poll_ctx(MDContext* ctx, MDCommand* cmd) {
     // {{{
-    if (ctx->cmd_list == NULL) {
+    if (ctx->cmds == NULL) {
         MD_ERROR("Context memory not initialized.");
         UNREACHABLE();
         return false;
     }
-    if (ctx->cmd_list_len == 0) {
+    if (ctx->cmds_len == 0) {
         return false;
     }
-    if (ctx->cmd_list_poll_index >= ctx->cmd_list_len) {
-        ctx->cmd_list_len = 0;
-        ctx->cmd_list_poll_index = 0;
+    if (ctx->cmds_poll_index >= ctx->cmds_len) {
+        ctx->cmds_len = 0;
+        ctx->cmds_poll_index = 0;
         return false;
     }
-    *cmd = ctx->cmd_list[ctx->cmd_list_poll_index++];
+    *cmd = ctx->cmds[ctx->cmds_poll_index++];
     return true;
     // }}}
 }
 
-MDButton md_button(MDButton button) { return md_button_ctx(&CTX, button); }
-MDButton md_button_ctx(MDContext* ctx, MDButton button) {
+MDCDiv mdc_div(MDCDiv div) { return mdc_div_ctx(&CTX, div); }
+MDCDiv mdc_div_ctx(MDContext* ctx, MDCDiv div) {
+    // {{{
+    // NOOP - div is just a box
+    UNUSED(ctx);
+    return div;
+    // }}}
+}
+
+bool mdc_render_div(MDCDiv div) { return mdc_render_div_ctx(&CTX, div); }
+bool mdc_render_div_ctx(MDContext* ctx, MDCDiv div) {
+    // {{{
+    // TODO: render edges?
+    UNUSED(ctx);
+    UNUSED(div);
+    return true;
+    // }}}
+}
+
+MDCButton mdc_button(MDCButton button) { return mdc_button_ctx(&CTX, button); }
+MDCButton mdc_button_ctx(MDContext* ctx, MDCButton button) {
     // {{{
     bool d_ele=0, d_fil=0, d_ton=0, d_out=0, d_txt=0;
     switch (button.design) {
@@ -551,8 +654,8 @@ MDButton md_button_ctx(MDContext* ctx, MDButton button) {
     // }}}
 }
 
-bool md_render_button(MDButton button) { return md_render_button_ctx(&CTX, button); }
-bool md_render_button_ctx(MDContext* ctx, MDButton button) {
+bool mdc_render_button(MDCButton button) { return mdc_render_button_ctx(&CTX, button); }
+bool mdc_render_button_ctx(MDContext* ctx, MDCButton button) {
     // {{{
     #define APPEND(CMD) md_ctx_append_ctx(ctx, (CMD)); (CMD)=(MDCommand){0}
     MDCommand cmd = {0};
@@ -651,14 +754,14 @@ bool md_render_button_ctx(MDContext* ctx, MDButton button) {
     // }}}
 }
 
-MDTab md_tab(MDTab tab) { return md_tab_ctx(&CTX, tab); }
-MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
+MDCTab mdc_tab(MDCTab tab) { return mdc_tab_ctx(&CTX, tab); }
+MDCTab mdc_tab_ctx(MDContext* ctx, MDCTab tab) {
     // {{{
     bool t_pri=0, t_sec=0;
     switch (tab.type) {
         // {{{
-        case MD_TAB_TYPE_PRIMARY:   t_pri=1; break;
-        case MD_TAB_TYPE_SECONDARY: t_sec=1; break;
+        case MDC_TAB_TYPE_PRIMARY:   t_pri=1; break;
+        case MDC_TAB_TYPE_SECONDARY: t_sec=1; break;
         default: MD_ERROR("Unknown tab type."); UNREACHABLE();
         // }}}
     }
@@ -666,10 +769,10 @@ MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
     bool s_ena=0, s_hov=0, s_foc=0, s_pre=0;
     switch (tab.state) {
         // {{{
-        case MD_TAB_STATE_ENABLED:  s_ena=1; break;
-        case MD_TAB_STATE_HOVERED:  s_hov=1; break;
-        case MD_TAB_STATE_FOCUSED:  s_foc=1; break;
-        case MD_TAB_STATE_PRESSED:  s_pre=1; break;
+        case MDC_TAB_STATE_ENABLED:  s_ena=1; break;
+        case MDC_TAB_STATE_HOVERED:  s_hov=1; break;
+        case MDC_TAB_STATE_FOCUSED:  s_foc=1; break;
+        case MDC_TAB_STATE_PRESSED:  s_pre=1; break;
         default: MD_ERROR("Unknown tab state."); UNREACHABLE();
         // }}}
     }
@@ -677,8 +780,8 @@ MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
     bool a_inl=0, a_sta=0;
     switch (tab.icon_align) {
         // {{{
-        case MD_TAB_ICON_ALIGN_INLINED: a_inl=1; break;
-        case MD_TAB_ICON_ALIGN_STACKED: a_sta=1; break;
+        case MD_ICON_ALIGN_INLINED: a_inl=1; break;
+        case MD_ICON_ALIGN_STACKED: a_sta=1; break;
         default: MD_ERROR("Unknown tab icon alignment."); UNREACHABLE();
         // }}}
     }
@@ -711,8 +814,8 @@ MDTab md_tab_ctx(MDContext* ctx, MDTab tab) {
     // }}}
 }
 
-bool md_render_tab(MDTab tab) { return md_render_tab_ctx(&CTX, tab); }
-bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
+bool mdc_render_tab(MDCTab tab) { return mdc_render_tab_ctx(&CTX, tab); }
+bool mdc_render_tab_ctx(MDContext* ctx, MDCTab tab) {
     // {{{
     #define APPEND(CMD) md_ctx_append_ctx(ctx, (CMD)); (CMD)=(MDCommand){0}
     MDCommand cmd = {0};
@@ -752,7 +855,7 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
         cmd.as.icon.icon_size = tab.icon_size;
         cmd.as.icon.box.x = tab.box.x + (tab.box.w - tab.text_size.x)/2.0;
         cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.icon_size)/2.0;
-        if (tab.icon_align == MD_TAB_ICON_ALIGN_STACKED) {
+        if (tab.icon_align == MD_ICON_ALIGN_STACKED) {
             cmd.as.icon.box.x = tab.box.x + (tab.box.w - tab.icon_size)/2.0;
             cmd.as.icon.box.y = tab.box.y + (tab.box.h - tab.icon_size - tab.text_size.y)/2.0;
         } else {
@@ -765,7 +868,7 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
         cmd.as.text.text = tab.text;
         cmd.as.text.color = tab.fg;
         cmd.as.text.font_size = tab.font_size;
-        if (tab.icon_align == MD_TAB_ICON_ALIGN_STACKED) {
+        if (tab.icon_align == MD_ICON_ALIGN_STACKED) {
             cmd.as.text.box.x = tab.box.x + (tab.box.w - tab.text_size.x)/2.0;
             cmd.as.text.box.y = tab.box.y + (tab.box.h + tab.icon_size - tab.text_size.y)/2.0;
             cmd.as.text.box.y -= 3*dp;
@@ -777,10 +880,10 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
     }
 
     // focus
-    if (tab.state == MD_TAB_STATE_FOCUSED) {
+    if (tab.state == MDC_TAB_STATE_FOCUSED) {
         f32 offset = 3*dp;
         if (tab.active) {
-            if (tab.type == MD_TAB_TYPE_PRIMARY) {
+            if (tab.type == MDC_TAB_TYPE_PRIMARY) {
                 offset += 3*dp;
             } else {
                 offset += 2*dp;
@@ -809,7 +912,7 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
         cmd.as.box.box = tab.box;
         cmd.as.box.box.y += cmd.as.box.box.h - 2*dp;
         cmd.as.box.box.h = 2*dp;
-        if (tab.type == MD_TAB_TYPE_PRIMARY) {
+        if (tab.type == MDC_TAB_TYPE_PRIMARY) {
             cmd.as.box.box.y -= dp;
             cmd.as.box.box.h += dp;
             cmd.as.box.round.tl = 3*dp;
@@ -817,7 +920,7 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
             cmd.as.box.round.bl = 0;
             cmd.as.box.round.br = 0;
             cmd.as.box.box.w = tab.text_size.x - 2*dp;
-            if (tab.icon_code != 0 && tab.icon_align == MD_TAB_ICON_ALIGN_INLINED) {
+            if (tab.icon_code != 0 && tab.icon_align == MD_ICON_ALIGN_INLINED) {
                 cmd.as.box.box.w += tab.icon_size + 4*dp;
             }
             cmd.as.box.box.w = MAX(cmd.as.box.box.w, 24*dp);
@@ -840,6 +943,75 @@ bool md_render_tab_ctx(MDContext* ctx, MDTab tab) {
     // }}}
 }
 
+MDComponent mdc_component(MDComponent component) { return mdc_component_ctx(&CTX, component); }
+MDComponent mdc_component_ctx(MDContext* ctx, MDComponent component) {
+    // {{{
+    switch (component.type) {
+        case MDC_DIV: component.as.div = mdc_div_ctx(ctx, component.as.div); break;
+        case MDC_BUTTON: component.as.button = mdc_button_ctx(ctx, component.as.button); break;
+        case MDC_TAB: component.as.tab = mdc_tab_ctx(ctx, component.as.tab); break;
+        default: MD_ERROR("Unknown component type"); UNREACHABLE();
+    }
+    return component;
+    // }}}
+}
+
+bool mdc_render_component(MDComponent component) { return mdc_render_component_ctx(&CTX, component); }
+bool mdc_render_component_ctx(MDContext* ctx, MDComponent component) {
+    // {{{
+    switch (component.type) {
+        case MDC_DIV: return mdc_render_div_ctx(ctx, component.as.div); break;
+        case MDC_BUTTON: return mdc_render_button_ctx(ctx, component.as.button); break;
+        case MDC_TAB: return mdc_render_tab_ctx(ctx, component.as.tab); break;
+        default: MD_ERROR("Unknown component type"); UNREACHABLE();
+    }
+    return false;
+    // }}}
+}
+
+i32 mdl_element_add(MDComponent comp, i32 parent_index) { return mdl_element_add_ctx(&CTX, comp, parent_index); }
+i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index) {
+    // {{{
+    if (ctx->elems == NULL) {
+        MD_ERROR("Context memory (elements) not initialized.");
+        UNREACHABLE();
+        return MD_ELEMENT_NIL;
+    }
+    if (ctx->elems_len >= ctx->elems_cap) {
+        MD_ERROR("Context memory (elements) was not big enough.");
+        UNREACHABLE();
+        return MD_ELEMENT_NIL;
+    }
+
+    i32 index = ctx->elems_len++;
+    MDElement* elem = &ctx->elems[index];
+
+    elem->comp = comp;
+    elem->parent = parent_index;
+    elem->child_first = MD_ELEMENT_NIL;
+    elem->child_last = MD_ELEMENT_NIL;
+    elem->sibling_next = MD_ELEMENT_NIL;
+    elem->sibling_prev = MD_ELEMENT_NIL;
+
+    if (parent_index != MD_ELEMENT_NIL) {
+        MDElement* p = &ctx->elems[parent_index];
+
+        if (p->child_last == MD_ELEMENT_NIL) {
+            // no children were set before
+            p->child_first = index;
+            p->child_last = index;
+        } else {
+            // append to the end
+            MDElement* old_last = &ctx->elems[p->child_last];
+            old_last->sibling_next = index;
+            elem->sibling_prev = p->child_last;
+            p->child_last = index;
+        }
+    }
+
+    return index;
+    // }}}
+}
 
 // DP = PX * 160 / DPI
 f32 md_px2dp(f32 px) { return md_px2dp_ctx(&CTX, px); }

@@ -35,14 +35,16 @@ i32 find_icon(const char* icon_name) {
     return 0;
 }
 
-void init_fonts(void) {
+void init_fonts(bool load_icons) {
     ROBOTO = LoadFontEx(ROBOTO_PATH, 60, NULL, 0);
     GenTextureMipmaps(&ROBOTO.texture);
     SetTextureFilter(ROBOTO.texture, TEXTURE_FILTER_BILINEAR);
 
-    ICONS = LoadFontEx(ICONS_PATH, 60, ICON_CODE, ICON_COUNT);
-    GenTextureMipmaps(&ICONS.texture);
-    SetTextureFilter(ICONS.texture, TEXTURE_FILTER_BILINEAR);
+    if (load_icons) {
+        ICONS = LoadFontEx(ICONS_PATH, 60, ICON_CODE, ICON_COUNT);
+        GenTextureMipmaps(&ICONS.texture);
+        SetTextureFilter(ICONS.texture, TEXTURE_FILTER_BILINEAR);
+    }
 }
 
 void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr, MDColor bg) {

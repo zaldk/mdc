@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
         snprintf((char*)source_here, 64, SRC"demo-%c.c", arg_demo[0]);
 
         nob_cc(&cmd);
-        cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=gnu99");
+        cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=c99");
         // cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
         cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
         cmd_append(&cmd, "-o", (char*)build_here, (char*)source_here);

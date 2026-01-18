@@ -20,7 +20,7 @@ static const char* TAB_LABELS[TABS_COUNT] = {
 };
 static i32 TAB_ICONS[TABS_COUNT];
 
-MDTabIconAlignment ALIGN = MD_TAB_ICON_ALIGN_STACKED;
+MDIconAlign ALIGN = MD_ICON_ALIGN_STACKED;
 
 void DrawLayout() {
     // {{{
@@ -37,26 +37,26 @@ void DrawLayout() {
                 DrawTextEx(ROBOTO, num, (Vector2){x-30, y+30}, 30.0, 0.0, COLOR.Scheme.OnBackground);
             }
 
-            MDTab input = {0};
+            MDCTab input = {0};
             input.box = (MDBox){x, y, max_width, 0};
             input.state = state; input.active = active;
             input.text = (char*)TAB_LABELS[index];
             input.icon_code = TAB_ICONS[index];
             input.icon_align = ALIGN;
-            input.type = MD_TAB_TYPE_PRIMARY;
-            MDTab output = md_tab(input);
-            md_render_tab(output);
+            input.type = MDC_TAB_TYPE_PRIMARY;
+            MDCTab output = mdc_tab(input);
+            mdc_render_tab(output);
             offset_x += output.box.w;
 
-            input = (MDTab){0};
+            input = (MDCTab){0};
             input.box = (MDBox){x + output.box.w, y, max_width, 0};
             input.state = 0; input.active = 0;
             input.text = (char*)TAB_LABELS[index];
             input.icon_code = TAB_ICONS[index];
             input.icon_align = ALIGN;
-            input.type = MD_TAB_TYPE_PRIMARY;
-            output = md_tab(input);
-            md_render_tab(output);
+            input.type = MDC_TAB_TYPE_PRIMARY;
+            output = mdc_tab(input);
+            mdc_render_tab(output);
             offset_x += output.box.w;
         }
     }
@@ -71,22 +71,22 @@ void DrawLayout() {
                 DrawTextEx(ROBOTO, num, (Vector2){x-30, y+30}, 30.0, 0.0, COLOR.Scheme.OnBackground);
             }
 
-            MDTab input = {0};
+            MDCTab input = {0};
             input.box = (MDBox){x, y, max_width, 0};
             input.state = state; input.active = active;
             input.text = (char*)TAB_LABELS[index];
-            input.type = MD_TAB_TYPE_SECONDARY;
-            MDTab output = md_tab(input);
-            md_render_tab(output);
+            input.type = MDC_TAB_TYPE_SECONDARY;
+            MDCTab output = mdc_tab(input);
+            mdc_render_tab(output);
             offset_x += output.box.w;
 
-            input = (MDTab){0};
+            input = (MDCTab){0};
             input.box = (MDBox){x + output.box.w, y, max_width, 0};
             input.state = 0; input.active = 0;
             input.text = (char*)TAB_LABELS[index];
-            input.type = MD_TAB_TYPE_SECONDARY;
-            output = md_tab(input);
-            md_render_tab(output);
+            input.type = MDC_TAB_TYPE_SECONDARY;
+            output = mdc_tab(input);
+            mdc_render_tab(output);
             offset_x += output.box.w;
         }
     }
@@ -108,16 +108,16 @@ int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN | FLAG_MSAA_4X_HINT);
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
-    init_fonts(); // must be done AFTER InitWindow()
+    init_fonts(true); // must be done AFTER InitWindow()
 
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
     Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
-    MDCommand cmd_list_memory[MD_COMMANDS_MAXIMUM_QUANTITY] = {0};
+    MDCommand cmd_list_memory[MD_COMMANDS_QUANTITY] = {0};
     md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(2);
     md_ctx_set_measure_text(measure_text_fn);
-    md_ctx_set_memory(cmd_list_memory);
+    md_ctx_set_memory_cmd(cmd_list_memory, MD_COMMANDS_QUANTITY);
 
     md_color_global_init(true);
 
