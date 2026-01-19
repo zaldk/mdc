@@ -9,4 +9,4 @@ Index:
 SemanticTokens:
   DisabledKinds: [InactiveCode]
 CompileFlags:
-  Add: [-DMD_UI_IMPLEMENTATION]
+  Add: [-DMD_UI_IMPLEMENTATION, -std=c99, -xc]

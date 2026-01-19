@@ -1,24 +1,26 @@
 #include "demo-helpers.h"
 
-static Vector2 MOUSE = {0};
-static bool MOUSE_DOWN = false;
-static bool MOUSE_PRESSED = false;
-
 Vec2 measure_text_fn(char* text, f32 font_size_px) {
     return MeasureTextEx(ROBOTO, text, font_size_px, 0);
 }
 
-void tree_print(u32 idx, int depth) {
+void tree_print_specific(i32 idx, int depth) {
     if (idx == -1) return;
 
     MDElement* elem = &CTX.elems[idx];
 
-    for (int i = 0; i < depth; i++) printf("\t");
+    for (int i = 0; i < depth; i++) printf("    ");
     printf("%d\n", elem->comp.type);
 
-    for (i32 child = elem->child_first; child != MD_ELEMENT_NIL;) {
-        tree_print(child, depth + 1);
+    for (i32 child = elem->child_first; child != MD_NIL_ELEMENT;) {
+        tree_print_specific(child, depth + 1);
         child = CTX.elems[child].sibling_next;
+    }
+}
+void tree_print() {
+    for (i32 i = 0; i < MD_MAX_ELEMENTS; i++) {
+        if (CTX.elems[i].parent != -1 || CTX.elems[i].child_first == -1) continue;
+        tree_print_specific(i, 0);
     }
 }
 
@@ -36,28 +38,36 @@ int main(void) {
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
     Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
-    MDCommand cmds[MD_COMMANDS_QUANTITY] = {0};
-    MDElement elems[MD_ELEMENTS_QUANTITY] = {0};
     md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(2);
     md_ctx_set_measure_text(measure_text_fn);
-    md_ctx_set_memory_cmd(cmds, MD_COMMANDS_QUANTITY);
-    md_ctx_set_memory_elem(elems, MD_ELEMENTS_QUANTITY);
 
-    i32 root = mdl_element_add((MDComponent){.type=1}, -1); // parent of root is root
-    i32 a = mdl_element_add((MDComponent){.type=2}, root);
-    i32 b = mdl_element_add((MDComponent){.type=3}, root);
-    mdl_element_add((MDComponent){.type=4}, a);
-    mdl_element_add((MDComponent){.type=5}, a);
-    mdl_element_add((MDComponent){.type=6}, b);
-
-    tree_print(root,0);
+    MDL(.type=1) {
+        MDL(.type=2) {
+            MDL(.type=3);
+            MDL(.type=4);
+        }
+        MDL(.type=5) {
+            MDL(.type=6);
+        }
+    }
+    MDL(.type=7) {
+        MDL(.type=8) {
+            MDL(.type=9);
+            MDL(.type=10);
+        }
+        MDL(.type=11) {
+            MDL(.type=12);
+        }
+    }
+    tree_print();
+    // __asm("int3");
 
     // while (!WindowShouldClose()) {
-    //     // {{{
-    //     MOUSE = GetMousePosition();
-    //     MOUSE_DOWN = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
-    //     MOUSE_PRESSED = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    //     {{{
+    //     // MOUSE = GetMousePosition();
+    //     // MOUSE_DOWN = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
+    //     // MOUSE_PRESSED = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     //     if (IsKeyPressed(KEY_SPACE)) md_color_global_switch_theme();
     //
     //     BeginDrawing();

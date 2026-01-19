@@ -113,11 +113,9 @@ int main(void) {
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
     Vec2 monitor_resolution = (Vec2){GetMonitorWidth(mon), GetMonitorHeight(mon)};
-    MDCommand cmd_list_memory[MD_COMMANDS_QUANTITY] = {0};
     md_ctx_init(monitor_size, monitor_resolution);
     md_ctx_set_scaling(2);
     md_ctx_set_measure_text(measure_text_fn);
-    md_ctx_set_memory_cmd(cmd_list_memory, MD_COMMANDS_QUANTITY);
 
     md_color_global_init(true);
 

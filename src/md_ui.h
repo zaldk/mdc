@@ -1,16 +1,18 @@
 /*
-Single header style library for Material Design
+Single header stb-style library for Material Design
 All measurements are in dp, unless stated otherwise.
 */
 
 #ifndef MD_UI /* {{{ */
 #define MD_UI
 
-#include <math.h>
-#include <string.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+
+#include "colors_material_palettes.h"
+#include "colors_material_schemes.h"
 
 typedef uint8_t      u8;
 typedef uint16_t    u16;
@@ -33,11 +35,11 @@ typedef double      f64;
 #define UNUSED(X) ((void)X)
 #define UNREACHABLE(S) assert(0 && (#S))
 
-#define MD_COMMANDS_QUANTITY 1024
-#define MD_ELEMENTS_QUANTITY 1024
-#define MD_ELEMENT_NIL (-1)
+#define MD_MAX_COMMANDS 1024
+#define MD_MAX_ELEMENTS 1024
+#define MD_NIL_ELEMENT (-1)
+#define MD_MAX_DEPTH 1024
 
-#include <stdio.h>
 #define MD_PRINTF printf
 #ifdef NO_LOGGING
 #       define MD_LOG(...) (void)0
@@ -61,9 +63,6 @@ typedef double      f64;
 #define MD_INFO(fmt,  ...) MD_LOG(ANSI_INFO  "<INFO>"  ANSI_CLEAR, fmt, ##__VA_ARGS__)
 #define MD_WARN(fmt,  ...) MD_LOG(ANSI_WARN  "<WARN>"  ANSI_CLEAR, fmt, ##__VA_ARGS__)
 #define MD_ERROR(fmt, ...) MD_LOG(ANSI_ERROR "<ERROR>" ANSI_CLEAR, fmt, ##__VA_ARGS__)
-
-#include "colors_material_palettes.h"
-#include "colors_material_schemes.h"
 
 #if defined(RAYLIB_H)
     typedef Color MDColor;
@@ -198,41 +197,12 @@ typedef Vec2 (*MDMeasureTextFn)(char* text, f32 font_size_px);
 typedef Vec2 (*MDGetMousePositionFn)(void);
 typedef bool (*MDCButtonDownFn)(MDInputButton button);
 
-typedef struct MDElement MDElement; // C sux, see below
-
-// {{{ MDContext
-typedef struct {
-    Vec2 monitor_size_mm; // physical size, in mm
-    Vec2 monitor_size_px; // width and height, in pixels
-    f32 ppi;              // pixels per inch
-    f32 scaling;          // default 1.0, used for in-app scaling.
-
-    MDMeasureTextFn measure_text;
-    MDGetMousePositionFn get_mouse;
-    MDCButtonDownFn button_down;
-
-    // Drawing Commands Buffer
-    MDCommand* cmds; // recommended be at least MD_COMMANDS_QUANTITY
-    i32 cmds_cap;
-    i32 cmds_len;
-    i32 cmds_poll_index; // internal use only
-
-    // Layout Components Buffer
-    MDElement* elems; // recommended be at least MD_COMPONENTS_QUANTITY
-    i32 elems_cap;
-    i32 elems_len;
-} MDContext;
-static MDContext CTX = {0};
-// }}}
+typedef struct MDContext MDContext; // see below
 
 void md_ctx_init(Vec2 monitor_size_mm, Vec2 monitor_size_px);
 void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px);
 void md_ctx_set_scaling(f32 scaling);
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling);
-void md_ctx_set_memory_cmd(void* memory, i32 count);
-void md_ctx_set_memory_cmd_ctx(MDContext* ctx, void* memory, i32 count);
-void md_ctx_set_memory_elem(void* memory, i32 count);
-void md_ctx_set_memory_elem_ctx(MDContext* ctx, void* memory, i32 count);
 
 void md_ctx_set_measure_text(MDMeasureTextFn fn);
 void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn);
@@ -253,9 +223,10 @@ f32 md_dp2px_ctx(MDContext* ctx, f32 dp);
 f32 md_pt2dp(f32 pt);
 f32 md_pt2dp_ctx(MDContext* ctx, f32 pt);
 
+// basically just a box
 // {{{ MDCDiv
 typedef struct {
-    MDBox box; // X,Y - required; W,H - inferred;
+    MDBox box;
 } MDCDiv;
 // }}}
 
@@ -263,8 +234,8 @@ MDCDiv mdc_div(MDCDiv div);
 MDCDiv mdc_div_ctx(MDContext* ctx, MDCDiv div);
 bool mdc_render_div(MDCDiv div);
 bool mdc_render_div_ctx(MDContext* ctx, MDCDiv div);
-// #define mdl_div(...) mdc_div((MDCDiv){__VA_ARGS__})
-// #define mdl_div_ctx(ctx, ...) mdc_div_ctx((ctx), (MDCDiv){__VA_ARGS__})
+// #define MD_DIV(...) mdc_div((MDCDiv){__VA_ARGS__})
+// #define MD_DIV_CTX(ctx, ...) mdc_div_ctx((ctx), (MDCDiv){__VA_ARGS__})
 
 /* https://m3.material.io/components/buttons/overview */
 // {{{ MDCButton
@@ -314,8 +285,8 @@ MDCButton mdc_button(MDCButton button);
 MDCButton mdc_button_ctx(MDContext* ctx, MDCButton button);
 bool mdc_render_button(MDCButton button);
 bool mdc_render_button_ctx(MDContext* ctx, MDCButton button);
-// #define mdl_button(...) mdc_button((MDCButton){__VA_ARGS__})
-// #define mdl_button_ctx(ctx, ...) mdc_button_ctx((ctx), (MDCButton){__VA_ARGS__})
+// #define MD_BUTTON(...) mdc_button((MDCButton){__VA_ARGS__})
+// #define MD_BUTTON_CTX(ctx, ...) mdc_button_ctx((ctx), (MDCButton){__VA_ARGS__})
 
 // {{{ MDCTab
 MD_ENUM(u8, MDCTabType) {
@@ -353,8 +324,8 @@ MDCTab mdc_tab(MDCTab tab);
 MDCTab mdc_tab_ctx(MDContext* ctx, MDCTab tab);
 bool mdc_render_tab(MDCTab tab);
 bool mdc_render_tab_ctx(MDContext* ctx, MDCTab tab);
-// #define mdl_tab(...) mdc_tab((MDCTab){__VA_ARGS__})
-// #define mdl_tab_ctx(ctx, ...) mdc_tab_ctx((ctx), (MDCTab){__VA_ARGS__})
+// #define MD_TAB(...) mdc_tab((MDCTab){__VA_ARGS__})
+// #define MD_TAB_CTX(ctx, ...) mdc_tab_ctx((ctx), (MDCTab){__VA_ARGS__})
 
 // {{{ MDComponent
 MD_ENUM(u8, MDComponentType) {
@@ -376,20 +347,67 @@ MDComponent mdc_component(MDComponent component);
 MDComponent mdc_component_ctx(MDContext* ctx, MDComponent component);
 bool mdc_render_component(MDComponent component);
 bool mdc_render_component_ctx(MDContext* ctx, MDComponent component);
-// #define mdl_component(...) mdc_component((MDComponent){__VA_ARGS__})
-// #define mdl_component_ctx(ctx, ...) mdc_component_ctx((ctx), (MDComponent){__VA_ARGS__})
+// #define MD_COMPONENT(...) mdc_component((MDComponent){__VA_ARGS__})
+// #define MD_COMPONENT_CTX(ctx, ...) mdc_component_ctx((ctx), (MDComponent){__VA_ARGS__})
 
 // {{{ MDElement
-struct MDElement {
+typedef struct {
     MDComponent comp;
-    i32 parent;
-    i32 child_first, child_last; // for performance reasons, the LL is made in reversed order
+    i32 parent, self;
+    i32 child_first, child_last;
     i32 sibling_next, sibling_prev;
-};
+} MDElement;
 // }}}
 
 i32 mdl_element_add(MDComponent comp, i32 parent_index);
 i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index);
+bool mdl_render_layout(void);
+bool mdl_render_layout_ctx(MDContext* ctx);
+
+// trick from clay.h (https://github.com/nicbarker/clay)
+static u8 _MDL_ELEMENT_LATCH;
+#define MDL(...) \
+    if (CTX._ps_len < 0) { MD_ERROR("Parent stack length cannot be negative"); UNREACHABLE(); } \
+    if (CTX._ps_len >= MD_MAX_DEPTH-1) { MD_ERROR("Reached layout depth limit (MD_MAX_DEPTH)"); UNREACHABLE(); } \
+    for ( \
+        _MDL_ELEMENT_LATCH = (CTX._ps[CTX._ps_len+1] = mdl_element_add((MDComponent){__VA_ARGS__}, CTX._ps[CTX._ps_len]), CTX._ps_len+=1, 0); \
+        _MDL_ELEMENT_LATCH < 1; \
+        _MDL_ELEMENT_LATCH = 1, CTX._ps_len = MAX(0,CTX._ps_len-1) \
+    )
+#define MDL_CTX(ctx, ...) \
+    if ((ctx)->_ps_len < 0) { MD_ERROR("Parent stack length cannot be negative"); UNREACHABLE(); } \
+    if ((ctx)->_ps_len >= MD_MAX_DEPTH-1) { MD_ERROR("Reached layout depth limit (MD_MAX_DEPTH)"); UNREACHABLE(); } \
+    for ( \
+        _MDL_ELEMENT_LATCH = ((ctx)->_ps[(ctx)->_ps_len++] = mdl_element_add_ctx((ctx), (MDComponent){__VA_ARGS__}, (ctx)->_ps[(ctx)->_ps_len]), (ctx)->_ps_len+=1, 0); \
+        _MDL_ELEMENT_LATCH < 1; \
+        _MDL_ELEMENT_LATCH = 1, (ctx)->_ps_len = MAX(0,(ctx)->_ps_len-1) \
+    )
+
+// {{{ MDContext
+struct MDContext {
+    Vec2 monitor_size_mm; // physical size, in mm
+    Vec2 monitor_size_px; // width and height, in pixels
+    f32 ppi;              // pixels per inch
+    f32 scaling;          // default 1.0, used for in-app scaling.
+
+    MDMeasureTextFn measure_text;
+    MDGetMousePositionFn get_mouse;
+    MDCButtonDownFn button_down;
+
+    // Drawing Commands Buffer
+    MDCommand cmds[MD_MAX_COMMANDS];
+    i32 cmds_len;
+    i32 cmds_poll_index; // internal use only
+
+    // Layout Components Buffer
+    MDElement elems[MD_MAX_ELEMENTS];
+    i32 elems_len;
+
+    i32 _ps[MD_MAX_DEPTH]; // layout parent stack, internal use only
+    i32 _ps_len;
+};
+static MDContext CTX = {0};
+// }}}
 
 #endif /* MD_UI }}} */
 
@@ -404,32 +422,15 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
     ctx->monitor_size_px = monitor_size_px;
     ctx->ppi = monitor_size_px.x / (monitor_size_mm.x/25.4f);
     ctx->scaling = 1;
-    // }}}
-}
-
-void md_ctx_set_memory_cmd(void* memory, i32 count) { md_ctx_set_memory_cmd_ctx(&CTX, memory, count); }
-void md_ctx_set_memory_cmd_ctx(MDContext* ctx, void* memory, i32 count) {
-    // {{{
-    if (memory == NULL) {
-        MD_ERROR("Memory cannot be NULL.");
-        UNREACHABLE();
-    }
-    ctx->cmds = (MDCommand*)memory;
-    ctx->cmds_cap = count;
     ctx->cmds_len = 0;
-    // }}}
-}
-
-void md_ctx_set_memory_elem(void* memory, i32 count) { md_ctx_set_memory_elem_ctx(&CTX, memory, count); }
-void md_ctx_set_memory_elem_ctx(MDContext* ctx, void* memory, i32 count) {
-    // {{{
-    if (memory == NULL) {
-        MD_ERROR("Memory cannot be NULL.");
-        UNREACHABLE();
-    }
-    ctx->elems = (MDElement*)memory;
-    ctx->elems_cap = count;
     ctx->elems_len = 0;
+    ctx->_ps_len = 0;
+
+    for (i32 i = 0; i < MD_MAX_DEPTH; i++) {
+        ctx->_ps[i] = MD_NIL_ELEMENT;
+    }
+
+    UNUSED(_MDL_ELEMENT_LATCH); // HACK: suppress warning
     // }}}
 }
 
@@ -448,12 +449,7 @@ void md_ctx_set_button_down_ctx(MDContext* ctx, MDCButtonDownFn fn) { ctx->butto
 bool md_ctx_append(MDCommand cmd) { return md_ctx_append_ctx(&CTX, cmd); }
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd) {
     // {{{
-    if (ctx->cmds == NULL) {
-        MD_ERROR("Context memory (commands) not initialized.");
-        UNREACHABLE();
-        return false;
-    }
-    if (ctx->cmds_len >= ctx->cmds_cap) {
+    if (ctx->cmds_len >= MD_MAX_COMMANDS) {
         MD_ERROR("Context memory (commands) was not big enough.");
         UNREACHABLE();
         return false;
@@ -466,11 +462,6 @@ bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd) {
 bool md_ctx_poll(MDCommand* cmd) { return md_ctx_poll_ctx(&CTX, cmd); }
 bool md_ctx_poll_ctx(MDContext* ctx, MDCommand* cmd) {
     // {{{
-    if (ctx->cmds == NULL) {
-        MD_ERROR("Context memory not initialized.");
-        UNREACHABLE();
-        return false;
-    }
     if (ctx->cmds_len == 0) {
         return false;
     }
@@ -972,46 +963,50 @@ bool mdc_render_component_ctx(MDContext* ctx, MDComponent component) {
 i32 mdl_element_add(MDComponent comp, i32 parent_index) { return mdl_element_add_ctx(&CTX, comp, parent_index); }
 i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index) {
     // {{{
-    if (ctx->elems == NULL) {
-        MD_ERROR("Context memory (elements) not initialized.");
-        UNREACHABLE();
-        return MD_ELEMENT_NIL;
-    }
-    if (ctx->elems_len >= ctx->elems_cap) {
+    if (ctx->elems_len >= MD_MAX_ELEMENTS) {
         MD_ERROR("Context memory (elements) was not big enough.");
         UNREACHABLE();
-        return MD_ELEMENT_NIL;
+        return MD_NIL_ELEMENT;
     }
 
-    i32 index = ctx->elems_len++;
-    MDElement* elem = &ctx->elems[index];
+    i32 self = ctx->elems_len++;
+    MDElement* this = &ctx->elems[self];
+    this->comp = comp;
+    this->self = self;
+    this->parent = parent_index;
+    this->child_first = MD_NIL_ELEMENT;
+    this->child_last = MD_NIL_ELEMENT;
+    this->sibling_next = MD_NIL_ELEMENT;
+    this->sibling_prev = MD_NIL_ELEMENT;
 
-    elem->comp = comp;
-    elem->parent = parent_index;
-    elem->child_first = MD_ELEMENT_NIL;
-    elem->child_last = MD_ELEMENT_NIL;
-    elem->sibling_next = MD_ELEMENT_NIL;
-    elem->sibling_prev = MD_ELEMENT_NIL;
-
-    if (parent_index != MD_ELEMENT_NIL) {
-        MDElement* p = &ctx->elems[parent_index];
-
-        if (p->child_last == MD_ELEMENT_NIL) {
+    if (parent_index != MD_NIL_ELEMENT) {
+        MDElement* parent = &ctx->elems[parent_index];
+        if (parent->child_last == MD_NIL_ELEMENT) {
             // no children were set before
-            p->child_first = index;
-            p->child_last = index;
+            parent->child_first = self;
+            parent->child_last = self;
         } else {
             // append to the end
-            MDElement* old_last = &ctx->elems[p->child_last];
-            old_last->sibling_next = index;
-            elem->sibling_prev = p->child_last;
-            p->child_last = index;
+            MDElement* old_last_child = &ctx->elems[parent->child_last];
+            old_last_child->sibling_next = self;
+            this->sibling_prev = parent->child_last;
+            parent->child_last = self;
         }
     }
 
-    return index;
+    return self;
     // }}}
 }
+
+bool mdl_render_layout(void) { return mdl_render_layout_ctx(&CTX); }
+bool mdl_render_layout_ctx(MDContext* ctx) {
+    // {{{
+    // TODO
+    return true;
+    // }}}
+}
+
+
 
 // DP = PX * 160 / DPI
 f32 md_px2dp(f32 px) { return md_px2dp_ctx(&CTX, px); }
@@ -1067,7 +1062,7 @@ void md_color_global_init(bool interpolate) {
     COLOR.Transparent = (MDColor){255,255,255,0};
 
     static MDColor colors[101];
-    memset(colors, 0, sizeof(MDColor)*101);
+    for (u8 i = 0; i < 101; i++) colors[i] = (MDColor){0};
     colors[0] = (MDColor){0,0,0,0xFF};
     colors[100] = (MDColor){0xFF,0xFF,0xFF,0xFF};
 
@@ -1076,7 +1071,7 @@ void md_color_global_init(bool interpolate) {
         COMBINE(MATERIAL_PALETTE_BASELINE_, NAME); \
         if (interpolate) _fill_in_gaps(colors); \
         for (u8 i = 0; i < 101; i++) ACCESS(Name)[i] = colors[i]; \
-        memset(&colors[1], 0, sizeof(MDColor)*99);
+        for (u8 i = 1; i < 100; i++) colors[i] = (MDColor){0};
 
     #define COMBINE(A,B) A##B
     #define ACCESS(Name) COLOR.Name
@@ -1092,7 +1087,7 @@ void md_color_global_init(bool interpolate) {
         COMBINE(MATERIAL_PALETTE_STATIC_, NAME); \
         if (interpolate) _fill_in_gaps(colors); \
         for (u8 i = 0; i < 101; i++) ACCESS(Name)[i] = colors[i]; \
-        memset(&colors[1], 0, sizeof(MDColor)*99);
+        for (u8 i = 1; i < 100; i++) colors[i] = (MDColor){0};
 
     #define COMBINE(A,B) A##B
     #define ACCESS(Name) COLOR.Name
