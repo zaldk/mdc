@@ -36,8 +36,8 @@ typedef double      f64;
 #define UNREACHABLE(S) assert(0 && (#S))
 
 #define MD_MAX_COMMANDS 1024
-#define MD_MAX_ELEMENTS 1024
-#define MD_NIL_ELEMENT (-1)
+#define MD_MAX_NODES 1024
+#define MD_NIL_NODE (-1)
 #define MD_MAX_DEPTH 1024
 
 #define MD_PRINTF printf
@@ -157,6 +157,7 @@ typedef u8 MDCommandType; enum {
     MD_COMMAND_DRAW_OUTLINE = 2,
     MD_COMMAND_DRAW_TEXT    = 3,
     MD_COMMAND_DRAW_ICON    = 4,
+    MD_COMMAND_DRAW_LAYOUT  = 5,
 };
 typedef struct {
     MDCommandType type;
@@ -184,6 +185,10 @@ typedef struct {
             i32 codepoint;
             f32 icon_size;
         } icon;
+        struct {
+            MDBox box; // bounding box of the screen
+            const char* id; // ID of the tab
+        } layout; // only used for calling user fn responsible for the tab render
     } as;
 } MDCommand;
 // }}}
@@ -193,6 +198,7 @@ MD_ENUM(u8, MDInputButton) {
     MD_INPUT_RMB = 1,
 };
 
+typedef Vec2 (*MDGetWindowSizeFn)(void);
 typedef Vec2 (*MDMeasureTextFn)(char* text, f32 font_size_px);
 typedef Vec2 (*MDGetMousePositionFn)(void);
 typedef bool (*MDCButtonDownFn)(MDInputButton button);
@@ -204,6 +210,8 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
 void md_ctx_set_scaling(f32 scaling);
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling);
 
+void md_ctx_set_get_window_size(MDGetWindowSizeFn fn);
+void md_ctx_set_get_window_size_ctx(MDContext* ctx, MDGetWindowSizeFn fn);
 void md_ctx_set_measure_text(MDMeasureTextFn fn);
 void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn);
 void md_ctx_set_mouse_pos(MDGetMousePositionFn fn);
@@ -351,37 +359,47 @@ bool mdc_render_component_ctx(MDContext* ctx, MDComponent component);
 // #define MD_COMPONENT_CTX(ctx, ...) mdc_component_ctx((ctx), (MDComponent){__VA_ARGS__})
 
 // {{{ MDElement
+MD_ENUM(u8, MDElementType) {
+    MDL_TYPE_TAB,    // 0  children (leaf node)
+    MDL_TYPE_STACK,  // 2  children
+    MDL_TYPE_INLINE, // 2  children
+    MDL_TYPE_TABS,   // 1+ children
+};
 typedef struct {
-    MDComponent comp;
+    MDElementType type;
+    // non-leaf-only
+    f32* split; // STACK/INLINE percentage [0 < split < 1]
+    i32* tab;   // TABS active tab index, 0-based
+    // leaf-only
+    const char* id;
+} MDElement;
+typedef struct {
+    MDElement element;
     i32 parent, self;
     i32 child_first, child_last;
     i32 sibling_next, sibling_prev;
-} MDElement;
+} MDLayoutNode;
 // }}}
 
-i32 mdl_element_add(MDComponent comp, i32 parent_index);
-i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index);
+i32 mdl_element_add(MDElement elem, i32 parent_index);
+i32 mdl_element_add_ctx(MDContext* ctx, MDElement elem, i32 parent_index);
 bool mdl_render_layout(void);
 bool mdl_render_layout_ctx(MDContext* ctx);
 
 // trick from clay.h (https://github.com/nicbarker/clay)
 static u8 _MDL_ELEMENT_LATCH;
-#define MDL(...) \
-    if (CTX._ps_len < 0) { MD_ERROR("Parent stack length cannot be negative"); UNREACHABLE(); } \
-    if (CTX._ps_len >= MD_MAX_DEPTH-1) { MD_ERROR("Reached layout depth limit (MD_MAX_DEPTH)"); UNREACHABLE(); } \
+#define _MDL_GENERIC(type, split, tab, id) \
+    if (CTX.ps_len < 0) { MD_ERROR("Parent stack length cannot be negative"); UNREACHABLE(); } \
+    if (CTX.ps_len >= MD_MAX_DEPTH-1) { MD_ERROR("Reached layout depth limit (MD_MAX_DEPTH)"); UNREACHABLE(); } \
     for ( \
-        _MDL_ELEMENT_LATCH = (CTX._ps[CTX._ps_len+1] = mdl_element_add((MDComponent){__VA_ARGS__}, CTX._ps[CTX._ps_len]), CTX._ps_len+=1, 0); \
+        _MDL_ELEMENT_LATCH = (CTX.ps[CTX.ps_len+1] = mdl_element_add((MDElement){type,split,tab,id}, CTX.ps[CTX.ps_len]), CTX.ps_len+=1, 0); \
         _MDL_ELEMENT_LATCH < 1; \
-        _MDL_ELEMENT_LATCH = 1, CTX._ps_len = MAX(0,CTX._ps_len-1) \
+        _MDL_ELEMENT_LATCH = 1, CTX.ps_len = MAX(0,CTX.ps_len-1) \
     )
-#define MDL_CTX(ctx, ...) \
-    if ((ctx)->_ps_len < 0) { MD_ERROR("Parent stack length cannot be negative"); UNREACHABLE(); } \
-    if ((ctx)->_ps_len >= MD_MAX_DEPTH-1) { MD_ERROR("Reached layout depth limit (MD_MAX_DEPTH)"); UNREACHABLE(); } \
-    for ( \
-        _MDL_ELEMENT_LATCH = ((ctx)->_ps[(ctx)->_ps_len++] = mdl_element_add_ctx((ctx), (MDComponent){__VA_ARGS__}, (ctx)->_ps[(ctx)->_ps_len]), (ctx)->_ps_len+=1, 0); \
-        _MDL_ELEMENT_LATCH < 1; \
-        _MDL_ELEMENT_LATCH = 1, (ctx)->_ps_len = MAX(0,(ctx)->_ps_len-1) \
-    )
+#define MDL_TAB(id)       _MDL_GENERIC(   MDL_TYPE_TAB,  NULL, NULL,   id)
+#define MDL_TABS(tab)     _MDL_GENERIC(  MDL_TYPE_TABS,  NULL,  tab, NULL)
+#define MDL_STACK(split)  _MDL_GENERIC( MDL_TYPE_STACK, split, NULL, NULL)
+#define MDL_INLINE(split) _MDL_GENERIC(MDL_TYPE_INLINE, split, NULL, NULL)
 
 // {{{ MDContext
 struct MDContext {
@@ -390,6 +408,7 @@ struct MDContext {
     f32 ppi;              // pixels per inch
     f32 scaling;          // default 1.0, used for in-app scaling.
 
+    MDGetWindowSizeFn get_window_size;
     MDMeasureTextFn measure_text;
     MDGetMousePositionFn get_mouse;
     MDCButtonDownFn button_down;
@@ -400,11 +419,11 @@ struct MDContext {
     i32 cmds_poll_index; // internal use only
 
     // Layout Components Buffer
-    MDElement elems[MD_MAX_ELEMENTS];
-    i32 elems_len;
+    MDLayoutNode nodes[MD_MAX_NODES];
+    i32 nodes_len;
 
-    i32 _ps[MD_MAX_DEPTH]; // layout parent stack, internal use only
-    i32 _ps_len;
+    i32 ps[MD_MAX_DEPTH]; // layout parent stack, internal use only
+    i32 ps_len;
 };
 static MDContext CTX = {0};
 // }}}
@@ -423,11 +442,11 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
     ctx->ppi = monitor_size_px.x / (monitor_size_mm.x/25.4f);
     ctx->scaling = 1;
     ctx->cmds_len = 0;
-    ctx->elems_len = 0;
-    ctx->_ps_len = 0;
+    ctx->nodes_len = 0;
+    ctx->ps_len = 0;
 
     for (i32 i = 0; i < MD_MAX_DEPTH; i++) {
-        ctx->_ps[i] = MD_NIL_ELEMENT;
+        ctx->ps[i] = MD_NIL_NODE;
     }
 
     UNUSED(_MDL_ELEMENT_LATCH); // HACK: suppress warning
@@ -436,6 +455,9 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
 
 void md_ctx_set_scaling(f32 scaling) { md_ctx_set_scaling_ctx(&CTX, scaling); }
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling) { ctx->scaling = scaling; }
+
+void md_ctx_set_get_window_size(MDGetWindowSizeFn fn) { md_ctx_set_get_window_size_ctx(&CTX, fn); }
+void md_ctx_set_get_window_size_ctx(MDContext* ctx, MDGetWindowSizeFn fn) { ctx->get_window_size = fn; }
 
 void md_ctx_set_measure_text(MDMeasureTextFn fn) { md_ctx_set_measure_text_ctx(&CTX, fn); }
 void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn) { ctx->measure_text = fn; }
@@ -960,34 +982,34 @@ bool mdc_render_component_ctx(MDContext* ctx, MDComponent component) {
     // }}}
 }
 
-i32 mdl_element_add(MDComponent comp, i32 parent_index) { return mdl_element_add_ctx(&CTX, comp, parent_index); }
-i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index) {
+i32 mdl_element_add(MDElement elem, i32 parent_index) { return mdl_element_add_ctx(&CTX, elem, parent_index); }
+i32 mdl_element_add_ctx(MDContext* ctx, MDElement elem, i32 parent_index) {
     // {{{
-    if (ctx->elems_len >= MD_MAX_ELEMENTS) {
+    if (ctx->nodes_len >= MD_MAX_NODES) {
         MD_ERROR("Context memory (elements) was not big enough.");
         UNREACHABLE();
-        return MD_NIL_ELEMENT;
+        return MD_NIL_NODE;
     }
 
-    i32 self = ctx->elems_len++;
-    MDElement* this = &ctx->elems[self];
-    this->comp = comp;
+    i32 self = ctx->nodes_len++;
+    MDLayoutNode* this = &ctx->nodes[self];
+    this->element = elem;
     this->self = self;
     this->parent = parent_index;
-    this->child_first = MD_NIL_ELEMENT;
-    this->child_last = MD_NIL_ELEMENT;
-    this->sibling_next = MD_NIL_ELEMENT;
-    this->sibling_prev = MD_NIL_ELEMENT;
+    this->child_first = MD_NIL_NODE;
+    this->child_last = MD_NIL_NODE;
+    this->sibling_next = MD_NIL_NODE;
+    this->sibling_prev = MD_NIL_NODE;
 
-    if (parent_index != MD_NIL_ELEMENT) {
-        MDElement* parent = &ctx->elems[parent_index];
-        if (parent->child_last == MD_NIL_ELEMENT) {
+    if (parent_index != MD_NIL_NODE) {
+        MDLayoutNode* parent = &ctx->nodes[parent_index];
+        if (parent->child_last == MD_NIL_NODE) {
             // no children were set before
             parent->child_first = self;
             parent->child_last = self;
         } else {
             // append to the end
-            MDElement* old_last_child = &ctx->elems[parent->child_last];
+            MDLayoutNode* old_last_child = &ctx->nodes[parent->child_last];
             old_last_child->sibling_next = self;
             this->sibling_prev = parent->child_last;
             parent->child_last = self;
@@ -998,10 +1020,147 @@ i32 mdl_element_add_ctx(MDContext* ctx, MDComponent comp, i32 parent_index) {
     // }}}
 }
 
+void _mdl_render_layout_ctx(MDContext* ctx, MDBox box, i32 id, i32 depth) {
+    // {{{
+    if (id == MD_NIL_NODE) return;
+
+    MDLayoutNode* node = &ctx->nodes[id];
+
+    switch (node->element.type) {
+        case MDL_TYPE_TAB: {
+            MDCommand cmd = {0};
+            cmd.type = MD_COMMAND_DRAW_LAYOUT;
+            cmd.as.layout.id = node->element.id;
+            cmd.as.layout.box = box;
+            md_ctx_append_ctx(ctx, cmd);
+
+            cmd = (MDCommand){0};
+            cmd.type = MD_COMMAND_DRAW_OUTLINE;
+            box.x += 10;
+            box.y += 10;
+            box.w -= 20;
+            box.h -= 20;
+            cmd.as.outline.box = box;
+            cmd.as.outline.color = COLOR.Red[50];
+            cmd.as.outline.thickness = 1;
+            cmd.as.outline.round.tl = 10;
+            cmd.as.outline.round.tr = 10;
+            cmd.as.outline.round.bl = 10;
+            cmd.as.outline.round.br = 10;
+            md_ctx_append_ctx(ctx, cmd);
+            return; // leaf node, guaranteed* to not have children
+        }; break;
+        case MDL_TYPE_TABS: {
+            // TODO: handle the tabbar offset properly
+            // f32 tabbar_height = 60;
+            // box.y += tabbar_height;
+            // box.h -= tabbar_height;
+            i32 active_tab = node->child_first;
+            if (active_tab == MD_NIL_NODE) {
+                MD_ERROR("TABS layout requires at least 1 child");
+                return;
+            }
+            i32 N = *node->element.tab;
+            for (i32 i = 0; i < N; i++) {
+                active_tab = ctx->nodes[active_tab].sibling_next;
+                if (active_tab == MD_NIL_NODE) {
+                    MD_ERROR("TABS layout could not find child #%d, only up to %d were found", N, i);
+                    return;
+                }
+            }
+            _mdl_render_layout_ctx(ctx, box, active_tab, depth + 1);
+            return;
+        }; break;
+        case MDL_TYPE_STACK: {
+            i32 child_top = node->child_first;
+            if (child_top == MD_NIL_NODE) {
+                MD_ERROR("STACK layout requires 2 children, got 0");
+                return;
+            }
+            i32 child_bot = ctx->nodes[child_top].sibling_next;
+            if (child_bot == MD_NIL_NODE) {
+                MD_ERROR("STACK layout requires 2 children, got 1");
+                return;
+            }
+            if (ctx->nodes[child_bot].sibling_next != MD_NIL_NODE) {
+                MD_WARN("STACK layout requires 2 children, the rest are ignored.");
+            }
+
+            MDBox box_top = box;
+            MDBox box_bot = box;
+            box_top.h *= *node->element.split;
+            box_bot.y += box_top.h;
+            box_bot.h -= box_top.h;
+
+            _mdl_render_layout_ctx(ctx, box_top, child_top, depth + 1);
+            _mdl_render_layout_ctx(ctx, box_bot, child_bot, depth + 1);
+
+            MDBox box_div = box;
+            box_div.x += 10;
+            box_div.w -= 20;
+            box_div.h = 10;
+            box_div.y = box_bot.y - 5;
+
+            MDCommand cmd = {0};
+            cmd.type = MD_COMMAND_DRAW_BOX;
+            cmd.as.box.box = box_div;
+            cmd.as.box.color = COLOR.Blue[50];
+            md_ctx_append_ctx(ctx, cmd);
+            return;
+        }; break;
+        case MDL_TYPE_INLINE: {
+            i32 child_l = node->child_first;
+            if (child_l == MD_NIL_NODE) {
+                MD_ERROR("INLINE layout requires 2 children, got 0");
+                return;
+            }
+            i32 child_r = ctx->nodes[child_l].sibling_next;
+            if (child_r == MD_NIL_NODE) {
+                MD_ERROR("INLINE layout requires 2 children, got 1");
+                return;
+            }
+            if (ctx->nodes[child_r].sibling_next != MD_NIL_NODE) {
+                MD_WARN("INLINE layout requires 2 children, the rest are ignored.");
+            }
+
+            MDBox box_l = box;
+            MDBox box_r = box;
+            box_l.w *= *node->element.split;
+            box_r.x += box_l.w;
+            box_r.w -= box_l.w;
+
+            _mdl_render_layout_ctx(ctx, box_l, child_l, depth + 1);
+            _mdl_render_layout_ctx(ctx, box_r, child_r, depth + 1);
+
+            MDBox box_div = box;
+            box_div.y += 10;
+            box_div.h -= 20;
+            box_div.w = 10;
+            box_div.x = box_r.x - 5;
+
+            MDCommand cmd = {0};
+            cmd.type = MD_COMMAND_DRAW_BOX;
+            cmd.as.box.box = box_div;
+            cmd.as.box.color = COLOR.Blue[50];
+            md_ctx_append_ctx(ctx, cmd);
+            return;
+        }; break;
+        default: UNREACHABLE();
+    }
+    UNREACHABLE();
+    // }}}
+}
+
 bool mdl_render_layout(void) { return mdl_render_layout_ctx(&CTX); }
 bool mdl_render_layout_ctx(MDContext* ctx) {
     // {{{
-    // TODO
+    // TODO: handle invalid state here
+    Vec2 screen = ctx->get_window_size();
+    MDBox box = {0};
+    box.w = screen.x;
+    box.h = screen.y;
+    _mdl_render_layout_ctx(ctx, box, 0, 0);
+    ctx->nodes_len = 0;
     return true;
     // }}}
 }
