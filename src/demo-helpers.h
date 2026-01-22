@@ -36,12 +36,12 @@ i32 find_icon(const char* icon_name) {
 }
 
 void init_fonts(bool load_icons) {
-    ROBOTO = LoadFontEx(ROBOTO_PATH, 60, NULL, 0);
+    ROBOTO = LoadFontEx(ROBOTO_PATH, 72, NULL, 0);
     GenTextureMipmaps(&ROBOTO.texture);
     SetTextureFilter(ROBOTO.texture, TEXTURE_FILTER_BILINEAR);
 
     if (load_icons) {
-        ICONS = LoadFontEx(ICONS_PATH, 60, ICON_CODE, ICON_COUNT);
+        ICONS = LoadFontEx(ICONS_PATH, 72, ICON_CODE, ICON_COUNT);
         GenTextureMipmaps(&ICONS.texture);
         SetTextureFilter(ICONS.texture, TEXTURE_FILTER_BILINEAR);
     }
