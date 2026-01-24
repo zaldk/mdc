@@ -55,8 +55,21 @@
 
 ---
 
-## Demo 7 - Interactive (Basic)
+## Demo 7 - Interactive (Manual)
 
 | Dark Scheme | Light Scheme |
 |-------------|--------------|
 | ![Dark Theme](images/demo_7_basic_interaction_dark.png) | ![Light Theme](images/demo_7_basic_interaction_light.png) |
+
+---
+
+## Demo 8 - Layoting Engine (Interactive)
+
+> [!Note]
+> This is an actually interactive demo,  
+> the tabs can be selected and the dividers can be moved.  
+> The layout is described in the `MakeLayout` function in the `demo-8.c` file.
+
+| Dark Scheme | Light Scheme |
+|-------------|--------------|
+| ![Dark Theme](images/demo_8_layouting_engine_dark.png) | ![Light Theme](images/demo_8_layouting_engine_light.png) |

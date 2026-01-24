@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
                 "5 - icons\n\t"
                 "6 - tabs\n\t"
                 "7 - interactive (basic, manual)\n\t"
-                "8 - layouting engine WIP\n\t"
+                "8 - layouting engine\n\t"
                 );
         return 0;
     }

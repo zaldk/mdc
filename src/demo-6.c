@@ -97,10 +97,6 @@ void DrawLayout() {
     // }}}
 }
 
-Vec2 measure_text_fn(char* text, f32 font_size_px) {
-    return MeasureTextEx(ROBOTO, text, font_size_px, 0);
-}
-
 int main(void) {
     const int W = 1000;
     const int H = 1000;

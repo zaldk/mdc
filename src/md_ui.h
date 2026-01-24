@@ -29,6 +29,7 @@ typedef double      f64;
 #define ABS(x) ((x)>=0?(x):-(x))
 #define MAX(a,b) ((a)>=(b)?(a):(b))
 #define MIN(a,b) ((a)<=(b)?(a):(b))
+#define CLAMP(x,a,b) MIN(MAX((x),(a)), (b))
 #define MD_ENUM(type, name) typedef type name; enum
 
 #define UNUSED(X) ((void)X)
@@ -152,15 +153,19 @@ typedef struct { MDAlign x, y; } MDTextAlign;
 
 MD_ENUM(u8, MDSize) { MD_SIZE_XS=1, MD_SIZE_S=2, MD_SIZE_M=0, MD_SIZE_L=3, MD_SIZE_XL=4 };
 MD_ENUM(u8, MDIconAlign) { MD_ICON_ALIGN_INLINED=0, MD_ICON_ALIGN_STACKED=1 };
+MD_ENUM(u8, MDCursor) { MD_CURSOR_DEFAULT=0, MD_CURSOR_RESIZE_NS=1, MD_CURSOR_RESIZE_EW=2 };
 
 // {{{ MDCommand
-typedef u8 MDCommandType; enum {
-    MD_COMMAND_DRAW_NONE    = 0,
-    MD_COMMAND_DRAW_BOX     = 1,
-    MD_COMMAND_DRAW_OUTLINE = 2,
-    MD_COMMAND_DRAW_TEXT    = 3,
-    MD_COMMAND_DRAW_ICON    = 4,
-    MD_COMMAND_DRAW_LAYOUT  = 5,
+MD_ENUM(u8, MDCommandType) {
+    MD_COMMAND_NONE           = 0, // never used by the library, encounter means a faulty command
+    MD_COMMAND_DRAW_BOX       = 1,
+    MD_COMMAND_DRAW_OUTLINE   = 2,
+    MD_COMMAND_DRAW_TEXT      = 3,
+    MD_COMMAND_DRAW_ICON      = 4,
+    MD_COMMAND_DRAW_TAB       = 5,
+    MD_COMMAND_SCISSOR_BEGIN  = 6,
+    MD_COMMAND_SCISSOR_END    = 7,
+    MD_COMMAND_SET_CURSOR     = 8,
 };
 typedef struct {
     MDCommandType type;
@@ -177,13 +182,13 @@ typedef struct {
             f32 thickness;
         } outline;
         struct {
-            MDBox box; // width and height are for scissor mode, ignored if 0
+            MDBox box; // TODO: width and height are for scissor mode, ignore if 0
             MDColor color;
             char* text;
             f32 font_size;
         } text;
         struct {
-            MDBox box; // width and height are for scissor mode, ignored if 0
+            MDBox box; // TODO: width and height are for scissor mode, ignore if 0
             MDColor color;
             i32 codepoint;
             f32 icon_size;
@@ -192,7 +197,13 @@ typedef struct {
             MDBox box; // bounding box of the screen
             const char* name; // NAME of the tab
             i32 id;
-        } layout; // only used for calling user fn responsible for the tab render
+        } tab; // only used for calling user fn responsible for the tab render
+        struct {
+            MDBox box;
+        } scissor;
+        struct {
+            MDCursor cursor;
+        } cursor;
     } as;
 } MDCommand;
 // }}}
@@ -202,11 +213,12 @@ MD_ENUM(u8, MDInputButton) {
     MD_INPUT_RMB = 1,
 };
 
-typedef Vec2 (*MDGetWindowSizeFn)(void);
+typedef Vec2 (*MDGetWindowResolutionFn)(void);
 typedef Vec2 (*MDMeasureTextFn)(char* text, f32 font_size_px);
 typedef Vec2 (*MDGetMousePositionFn)(void);
 typedef bool (*MDCButtonDownFn)(MDInputButton button);
 typedef bool (*MDCButtonPressedFn)(MDInputButton button);
+typedef bool (*MDCButtonReleasedFn)(MDInputButton button);
 
 typedef struct MDContext MDContext; // see below
 
@@ -215,8 +227,8 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
 void md_ctx_set_scaling(f32 scaling);
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling);
 
-void md_ctx_set_get_window_size(MDGetWindowSizeFn fn);
-void md_ctx_set_get_window_size_ctx(MDContext* ctx, MDGetWindowSizeFn fn);
+void md_ctx_set_get_window_size(MDGetWindowResolutionFn fn);
+void md_ctx_set_get_window_size_ctx(MDContext* ctx, MDGetWindowResolutionFn fn);
 void md_ctx_set_measure_text(MDMeasureTextFn fn);
 void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn);
 void md_ctx_set_get_mouse_pos(MDGetMousePositionFn fn);
@@ -225,6 +237,8 @@ void md_ctx_set_button_down(MDCButtonDownFn fn);
 void md_ctx_set_button_down_ctx(MDContext* ctx, MDCButtonDownFn fn);
 void md_ctx_set_button_pressed(MDCButtonPressedFn fn);
 void md_ctx_set_button_pressed_ctx(MDContext* ctx, MDCButtonPressedFn fn);
+void md_ctx_set_button_released(MDCButtonReleasedFn fn);
+void md_ctx_set_button_released_ctx(MDContext* ctx, MDCButtonReleasedFn fn);
 
 bool md_ctx_append(MDCommand cmd);
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd);
@@ -427,11 +441,12 @@ struct MDContext {
     f32 ppi;              // pixels per inch
     f32 scaling;          // default 1.0, used for in-app scaling.
 
-    MDGetWindowSizeFn get_window_size;
+    MDGetWindowResolutionFn get_window_resolution;
     MDMeasureTextFn measure_text;
-    MDGetMousePositionFn get_mouse;
+    MDGetMousePositionFn get_mouse_position;
     MDCButtonDownFn button_down;
     MDCButtonPressedFn button_pressed;
+    MDCButtonReleasedFn button_released;
 
     // Drawing Commands Buffer
     MDCommand cmds[MD_MAX_COMMANDS];
@@ -444,7 +459,7 @@ struct MDContext {
     i32 ps[MD_MAX_DEPTH]; // parent stack
     i32 ps_len;
     i32 id_gen;
-    bool holding_divider;
+    i32 held_node_id; // the parent of the divider currently being held, NIL otherwise
 };
 static MDContext CTX = {0};
 // }}}
@@ -468,6 +483,7 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
     ctx->cmds_len = 0;
     ctx->nodes_len = 0;
     ctx->ps_len = 0;
+    ctx->held_node_id = MD_NIL;
 
     for (i32 i = 0; i < MD_MAX_DEPTH; i++) {
         ctx->ps[i] = MD_NIL;
@@ -488,20 +504,23 @@ void md_ctx_init_ctx(MDContext* ctx, Vec2 monitor_size_mm, Vec2 monitor_size_px)
 void md_ctx_set_scaling(f32 scaling) { md_ctx_set_scaling_ctx(&CTX, scaling); }
 void md_ctx_set_scaling_ctx(MDContext* ctx, f32 scaling) { ctx->scaling = scaling; }
 
-void md_ctx_set_get_window_size(MDGetWindowSizeFn fn) { md_ctx_set_get_window_size_ctx(&CTX, fn); }
-void md_ctx_set_get_window_size_ctx(MDContext* ctx, MDGetWindowSizeFn fn) { ctx->get_window_size = fn; }
+void md_ctx_set_get_window_size(MDGetWindowResolutionFn fn) { md_ctx_set_get_window_size_ctx(&CTX, fn); }
+void md_ctx_set_get_window_size_ctx(MDContext* ctx, MDGetWindowResolutionFn fn) { ctx->get_window_resolution = fn; }
 
 void md_ctx_set_measure_text(MDMeasureTextFn fn) { md_ctx_set_measure_text_ctx(&CTX, fn); }
 void md_ctx_set_measure_text_ctx(MDContext* ctx, MDMeasureTextFn fn) { ctx->measure_text = fn; }
 
 void md_ctx_set_get_mouse_pos(MDGetMousePositionFn fn) { md_ctx_set_get_mouse_pos_ctx(&CTX, fn); }
-void md_ctx_set_get_mouse_pos_ctx(MDContext* ctx, MDGetMousePositionFn fn) { ctx->get_mouse = fn; }
+void md_ctx_set_get_mouse_pos_ctx(MDContext* ctx, MDGetMousePositionFn fn) { ctx->get_mouse_position = fn; }
 
 void md_ctx_set_button_down(MDCButtonDownFn fn) { md_ctx_set_button_down_ctx(&CTX, fn); }
 void md_ctx_set_button_down_ctx(MDContext* ctx, MDCButtonDownFn fn) { ctx->button_down = fn; }
 
 void md_ctx_set_button_pressed(MDCButtonPressedFn fn) { md_ctx_set_button_pressed_ctx(&CTX, fn); }
 void md_ctx_set_button_pressed_ctx(MDContext* ctx, MDCButtonPressedFn fn) { ctx->button_pressed = fn; }
+
+void md_ctx_set_button_released(MDCButtonReleasedFn fn) { md_ctx_set_button_released_ctx(&CTX, fn); }
+void md_ctx_set_button_released_ctx(MDContext* ctx, MDCButtonReleasedFn fn) { ctx->button_released = fn; }
 
 bool md_ctx_append(MDCommand cmd) { return md_ctx_append_ctx(&CTX, cmd); }
 bool md_ctx_append_ctx(MDContext* ctx, MDCommand cmd) {
@@ -1171,8 +1190,9 @@ void _mdl_update_layout_ctx(MDContext* ctx, i32 id) {
     // {{{
     if (id == MD_NIL) return;
 
+    // TODO: redundant checks
     static u8 get_mouse_error = 0;
-    if (ctx->get_mouse == NULL) {
+    if (ctx->get_mouse_position == NULL) {
         MD_WARN_ONCE(get_mouse_error, "Context's get_mouse fn was not provided, interactivity disabled.");
         return;
     }
@@ -1184,6 +1204,11 @@ void _mdl_update_layout_ctx(MDContext* ctx, i32 id) {
     static u8 button_pressed_error = 0;
     if (ctx->button_pressed == NULL) {
         MD_WARN_ONCE(button_pressed_error, "Context's button_pressed fn was not provided, interactivity disabled.");
+        return;
+    }
+    static u8 button_released_error = 0;
+    if (ctx->button_released == NULL) {
+        MD_WARN_ONCE(button_released_error, "Context's button_released fn was not provided, interactivity disabled.");
         return;
     }
 
@@ -1231,7 +1256,7 @@ void _mdl_update_layout_ctx(MDContext* ctx, i32 id) {
                 tab.text = (char*)ctx->nodes[child].element.name;
                 tab = mdc_tab_ctx(ctx, tab);
                 off_x += tab.box.w;
-                if (md_point_in_box(ctx->get_mouse(), tab.box)) {
+                if (ctx->held_node_id == MD_NIL && md_point_in_box(ctx->get_mouse_position(), tab.box)) {
                     if (ctx->button_pressed(MD_INPUT_LMB)) {
                         node->element.active_tab = child;
                         *node->element.tab = i;
@@ -1272,10 +1297,30 @@ void _mdl_update_layout_ctx(MDContext* ctx, i32 id) {
                 box_div.y -= divider;
             } else { UNREACHABLE(); }
 
-            // TODO: dividers...
-            // if (md_point_in_box(ctx->get_mouse(), box_div)) {
-            //     ctx->holding_divider = ctx->button_down(MD_INPUT_LMB);
-            // }
+            // divider holding...
+            // is pressed and in div => holding
+            // is released => not holding
+            if (md_point_in_box(ctx->get_mouse_position(), box_div)) {
+                if (ctx->button_pressed(MD_INPUT_LMB)) {
+                    ctx->held_node_id = node->self;
+                }
+            }
+            if (ctx->button_released(MD_INPUT_LMB)) {
+                ctx->held_node_id = MD_NIL;
+            }
+            if (ctx->held_node_id == node->self) {
+                MDBox box = node->element.box;
+                Vec2 mp = ctx->get_mouse_position();
+                f32 offset_percentage = 0;
+                if (node->element.type == MDL_TYPE_INLINE) {
+                    *node->element.split = (mp.x - box.x) / box.w;
+                    offset_percentage = box_div.w / box.w;
+                } else if (node->element.type == MDL_TYPE_STACK) {
+                    *node->element.split = (mp.y - box.y) / box.h;
+                    offset_percentage = box_div.h / box.h;
+                } else { UNREACHABLE(); }
+                *node->element.split = CLAMP(*node->element.split, offset_percentage, 1-offset_percentage);
+            }
 
             {
                 MDCommand cmd = {0};
@@ -1327,12 +1372,25 @@ void _mdl_render_layout_ctx(MDContext* ctx, i32 id) {
         case MDL_TYPE_TAB: {
             // {{{
             if (node->child_first == MD_NIL) {
-                MDCommand cmd = {0};
-                cmd.type = MD_COMMAND_DRAW_LAYOUT;
-                cmd.as.layout.name = node->element.name;
-                cmd.as.layout.box = node->element.box;
-                cmd.as.layout.id = node->element.id;
-                md_ctx_append_ctx(ctx, cmd);
+                {
+                    MDCommand cmd = {0};
+                    cmd.type = MD_COMMAND_SCISSOR_BEGIN;
+                    cmd.as.scissor.box = node->element.box;
+                    md_ctx_append_ctx(ctx, cmd);
+                }
+                {
+                    MDCommand cmd = {0};
+                    cmd.type = MD_COMMAND_DRAW_TAB;
+                    cmd.as.tab.name = node->element.name;
+                    cmd.as.tab.box = node->element.box;
+                    cmd.as.tab.id = node->element.id;
+                    md_ctx_append_ctx(ctx, cmd);
+                }
+                {
+                    MDCommand cmd = {0};
+                    cmd.type = MD_COMMAND_SCISSOR_END;
+                    md_ctx_append_ctx(ctx, cmd);
+                }
             } else {
                 _mdl_render_layout_ctx(ctx, node->child_first);
             }
@@ -1376,7 +1434,7 @@ void _mdl_render_layout_ctx(MDContext* ctx, i32 id) {
                 tab.active = (active_tab == child);
                 tab.text = (char*)ctx->nodes[child].element.name;
                 tab = mdc_tab_ctx(ctx, tab);
-                if (md_point_in_box(ctx->get_mouse(), tab.box)) {
+                if (ctx->held_node_id == MD_NIL && md_point_in_box(ctx->get_mouse_position(), tab.box)) {
                     if (ctx->button_pressed(MD_INPUT_LMB)) {
                         tab.active = true;
                     } else {
@@ -1426,6 +1484,21 @@ void _mdl_render_layout_ctx(MDContext* ctx, i32 id) {
                 box_div.y -= divider;
             } else { UNREACHABLE(); }
 
+            // setting cursor to default does not require this node, so i took it out to the caller
+            if (ctx->held_node_id == node->self) {
+                if (node->element.type == MDL_TYPE_INLINE) {
+                    MDCommand cmd = {0};
+                    cmd.type = MD_COMMAND_SET_CURSOR;
+                    cmd.as.cursor.cursor = MD_CURSOR_RESIZE_EW;
+                    md_ctx_append_ctx(ctx, cmd);
+                } else if (node->element.type == MDL_TYPE_STACK) {
+                    MDCommand cmd = {0};
+                    cmd.type = MD_COMMAND_SET_CURSOR;
+                    cmd.as.cursor.cursor = MD_CURSOR_RESIZE_NS;
+                    md_ctx_append_ctx(ctx, cmd);
+                } else { UNREACHABLE(); }
+            }
+
             {
                 MDCommand cmd = {0};
                 cmd.type = MD_COMMAND_DRAW_BOX;
@@ -1462,17 +1535,23 @@ bool mdl_render_layout_ctx(MDContext* ctx) {
     }
     Vec2 screen = {0};
     static u8 no_window_size_error = 0;
-    if (ctx->get_window_size == NULL) {
+    if (ctx->get_window_resolution == NULL) {
         MD_WARN_ONCE(no_window_size_error, "Layouting engine expects the get_window_size fn to be non-NULL, using fallback 800x600");
         screen.x = 800; screen.y = 600;
     } else {
-        screen = ctx->get_window_size();
+        screen = ctx->get_window_resolution();
     }
     MDBox box = {0};
     box.w = screen.x;
     box.h = screen.y;
     _mdl_calc_layout_ctx(ctx, box, 0);
     _mdl_render_layout_ctx(ctx, 0);
+    if (ctx->held_node_id == MD_NIL) {
+        MDCommand cmd = {0};
+        cmd.type = MD_COMMAND_SET_CURSOR;
+        cmd.as.cursor.cursor = MD_CURSOR_DEFAULT;
+        md_ctx_append_ctx(ctx, cmd);
+    }
     ctx->nodes_len = 0;
     return true;
     // }}}
@@ -1487,18 +1566,37 @@ bool mdl_update_and_render_layout_ctx(MDContext* ctx) {
     }
     Vec2 screen = {0};
     static u8 no_window_size_error = 0;
-    if (ctx->get_window_size == NULL) {
+    if (ctx->get_window_resolution == NULL) {
         MD_WARN_ONCE(no_window_size_error, "Layouting engine expects the get_window_size fn to be non-NULL, using fallback 800x600");
         screen.x = 800; screen.y = 600;
     } else {
-        screen = ctx->get_window_size();
+        screen = ctx->get_window_resolution();
     }
+    if (ctx->button_down == NULL) {
+        MD_ERROR("Layout Update requires a button_down fn.");
+        return false;
+    }
+    if (ctx->button_pressed == NULL) {
+        MD_ERROR("Layout Update requires a button_pressed fn.");
+        return false;
+    }
+    if (ctx->button_released == NULL) {
+        MD_ERROR("Layout Update requires a button_released fn.");
+        return false;
+    }
+
     MDBox box = {0};
     box.w = screen.x;
     box.h = screen.y;
     _mdl_calc_layout_ctx(ctx, box, 0);
     _mdl_update_layout_ctx(ctx, 0);
     _mdl_render_layout_ctx(ctx, 0);
+    if (ctx->held_node_id == MD_NIL) {
+        MDCommand cmd = {0};
+        cmd.type = MD_COMMAND_SET_CURSOR;
+        cmd.as.cursor.cursor = MD_CURSOR_DEFAULT;
+        md_ctx_append_ctx(ctx, cmd);
+    }
     ctx->nodes_len = 0;
     return true;
     // }}}

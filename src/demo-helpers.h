@@ -146,3 +146,29 @@ void DrawBoxRoundLines(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f3
     DrawRectangleRec((Rectangle){x + w - ht, y + r2, thickness, h - r2 - r4}, color); // Right edge
     // }}}
 }
+
+Vec2 measure_text_fn(char* text, f32 font_size_px) { return MeasureTextEx(ROBOTO, text, font_size_px, 0); }
+Vec2 get_window_size_fn(void) { return (Vec2){(f32)GetScreenWidth(), (f32)GetScreenHeight()}; }
+Vec2 get_mouse_position_fn(void) { return GetMousePosition(); }
+
+bool button_down_fn(MDInputButton button) {
+    switch (button) {
+        case MD_INPUT_LMB: return IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+        case MD_INPUT_RMB: return IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+        default: UNREACHABLE();
+    }
+}
+bool button_pressed_fn(MDInputButton button) {
+    switch (button) {
+        case MD_INPUT_LMB: return IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+        case MD_INPUT_RMB: return IsMouseButtonPressed(MOUSE_BUTTON_RIGHT);
+        default: UNREACHABLE();
+    }
+}
+bool button_released_fn(MDInputButton button) {
+    switch (button) {
+        case MD_INPUT_LMB: return IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
+        case MD_INPUT_RMB: return IsMouseButtonReleased(MOUSE_BUTTON_RIGHT);
+        default: UNREACHABLE();
+    }
+}

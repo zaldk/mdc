@@ -1,32 +1,5 @@
 #include "demo-helpers.h"
 
-Vec2 measure_text_fn(char* text, f32 font_size_px) {
-    return MeasureTextEx(ROBOTO, text, font_size_px, 0);
-}
-
-Vec2 get_window_size_fn(void) {
-    return (Vec2){(f32)GetScreenWidth(), (f32)GetScreenHeight()};
-}
-
-Vec2 get_mouse_position_fn(void) {
-    return GetMousePosition();
-}
-
-bool button_down_fn(MDInputButton button) {
-    switch (button) {
-        case MD_INPUT_LMB: return IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-        case MD_INPUT_RMB: return IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
-        default: UNREACHABLE();
-    }
-}
-bool button_pressed_fn(MDInputButton button) {
-    switch (button) {
-        case MD_INPUT_LMB: return IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-        case MD_INPUT_RMB: return IsMouseButtonPressed(MOUSE_BUTTON_RIGHT);
-        default: UNREACHABLE();
-    }
-}
-
 void draw_tab(MDBox box, const char* name, i32 id) {
     Vec2 m = measure_text_fn((char*)name, 20);
     DrawTextEx(ROBOTO, name, (Vector2){box.x + (box.w-m.x)/2, box.y + (box.h-m.y)/2}, 20, 0, COLOR.Scheme.OnBackground);
@@ -66,7 +39,7 @@ void MakeLayout(void) {
             MDL_TAB("CmdLine");
             MDL_TABS(&t3) {
                 MDL_TAB("Watch") {
-                    MDL_INLINE(&s3) {
+                    MDL_STACK(&s3) {
                         MDL_TAB("Analog");
                         MDL_TAB("Digital");
                     }
@@ -81,12 +54,13 @@ void MakeLayout(void) {
 }
 
 int main(void) {
-    const int W = 800;
-    const int H = 800;
+    const i32 W = 800;
+    const i32 H = 800;
+    const i32 frame_rate = 120;
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN | FLAG_MSAA_4X_HINT);
     InitWindow(W, H, "FLOAT");
-    SetTargetFPS(120);
+    SetTargetFPS(frame_rate);
 
     md_color_global_init(true);
     init_fonts(false); // demo-helper; must be done AFTER InitWindow()
@@ -102,8 +76,11 @@ int main(void) {
     md_ctx_set_get_mouse_pos(get_mouse_position_fn);
     md_ctx_set_button_down(button_down_fn);
     md_ctx_set_button_pressed(button_pressed_fn);
+    md_ctx_set_button_released(button_released_fn);
 
     // const f32 dp = md_dp2px(1);
+    f32 frame = 0;
+    f32 duration = 3;
     while (!WindowShouldClose()) {
         // {{{
         CTX.id_gen = 0;
@@ -111,6 +88,14 @@ int main(void) {
 
         BeginDrawing();
         ClearBackground(COLOR.Scheme.Surface);
+
+        if (frame <= frame_rate*duration) {
+            // s1 = (f32)frame / (frame_rate*duration);
+            // s2 = (f32)frame / (frame_rate*duration);
+            // s3 = (f32)frame / (frame_rate*duration);
+            // i1 = (f32)frame / (frame_rate*duration);
+            // i2 = (f32)frame / (frame_rate*duration);
+        }
 
         MakeLayout();
         if (!mdl_update_and_render_layout()) break;
@@ -146,17 +131,33 @@ int main(void) {
                     // so by default the icons are shown a bit to the left.
                     DrawTextCodepoint(ICONS, cmd.as.icon.codepoint, (Vector2){box.x+fs*0.1, box.y}, fs, col);
                 }; break;
-                case MD_COMMAND_DRAW_LAYOUT: {
-                    draw_tab(cmd.as.layout.box, cmd.as.layout.name, cmd.as.layout.id);
+                case MD_COMMAND_DRAW_TAB: {
+                    draw_tab(cmd.as.tab.box, cmd.as.tab.name, cmd.as.tab.id);
+                }; break;
+                case MD_COMMAND_SCISSOR_BEGIN: {
+                    MDBox box = cmd.as.scissor.box;
+                    BeginScissorMode(box.x, box.y, box.w, box.h);
+                }; break;
+                case MD_COMMAND_SCISSOR_END: {
+                    EndScissorMode();
+                }; break;
+                case MD_COMMAND_SET_CURSOR: {
+                    switch (cmd.as.cursor.cursor) {
+                        case MD_CURSOR_DEFAULT: SetMouseCursor(MOUSE_CURSOR_DEFAULT); break;
+                        case MD_CURSOR_RESIZE_NS: SetMouseCursor(MOUSE_CURSOR_RESIZE_NS); break;
+                        case MD_CURSOR_RESIZE_EW: SetMouseCursor(MOUSE_CURSOR_RESIZE_EW); break;
+                        default: UNREACHABLE();
+                    }
                 }; break;
                 default: UNREACHABLE();
             }
             // }}}
         }
 
-        DrawFPS(0,0);
+        // DrawFPS(0,0);
         DrawTextEx(ROBOTO, "Press 'Space' To Change Theme", (Vector2){5, GetScreenHeight()-20}, 20.0, 0.0, COLOR.Scheme.OnSurface);
         EndDrawing();
+        frame += 1;
         // }}}
     }
 
