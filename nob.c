@@ -1,6 +1,4 @@
 #define NOB_IMPLEMENTATION
-#define NOB_STRIP_PREFIX
-#define NOB_EXPERIMENTAL_DELETE_OLD
 #include "nob.h"
 
 #define BUILD ".build/"
@@ -8,36 +6,34 @@
 static Cmd cmd = {0};
 
 int main(int argc, char **argv) {
-    NOB_GO_REBUILD_URSELF(argc, argv);
+    #ifndef _WIN32
+        NOB_GO_REBUILD_URSELF(argc, argv);
+    #endif
 
-    cmd_append(&cmd, "clear");
-    if (!cmd_run(&cmd)) return 1;
+    #ifdef _WIN32
+        cmd_append(&cmd, "cmd", "/c", "cls");
+    #else
+        cmd_append(&cmd, "clear");
+    #endif
+    assert(cmd_run(&cmd));
 
-    cmd_append(&cmd, "test", "-d", BUILD);
-    if (!cmd_run(&cmd)) {
-        cmd_append(&cmd, "mkdir", "-p", BUILD);
-        if (!cmd_run(&cmd)) return 1;
-    }
-
-    cmd_append(&cmd, "test", "-f", BUILD".gitignore");
-    if (!cmd_run(&cmd)) {
-        cmd_append(&cmd, "printf", "*");
-        if (!cmd_run(&cmd, .stdout_path = BUILD".gitignore")) return 1;
-    }
+    assert(nob_mkdir_if_not_exists(BUILD));
+    assert(nob_write_entire_file(BUILD".gitignore", "*", 1));
 
     char* nob_name = shift(argv, argc);
     if (argc == 0) {
         nob_log(NOB_INFO, "USAGE: %s N r?\n\tN - Number of the demo to build\n\tr - optional flag to run the built demo", nob_name);
-        nob_log(NOB_INFO, "Available demos:\n\t"
-                "1 - color schemes\n\t"
-                "2 - all colors\n\t"
-                "3 - rounded rectangles\n\t"
-                "4 - buttons\n\t"
-                "5 - icons\n\t"
-                "6 - tabs\n\t"
-                "7 - interactive (basic, manual)\n\t"
-                "8 - layouting engine\n\t"
-                );
+        nob_log(NOB_INFO,
+            "Available demos:\n\t"
+            "1 - color schemes\n\t"
+            "2 - all colors\n\t"
+            "3 - rounded rectangles\n\t"
+            "4 - buttons\n\t"
+            "5 - icons\n\t"
+            "6 - tabs\n\t"
+            "7 - interactive (basic, manual)\n\t"
+            "8 - layouting engine\n\t"
+        );
         return 0;
     }
 
@@ -49,12 +45,22 @@ int main(int argc, char **argv) {
         char* source_here[64] = {0};
         snprintf((char*)source_here, 64, SRC"demo-%c.c", arg_demo[0]);
 
-        nob_cc(&cmd);
-        cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=c99");
+        #ifdef _WIN32
+            cmd_append(&cmd, "zig", "cc");
+        #else
+            nob_cc(&cmd);
+        #endif
+        // cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=c99");
         // cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
-        cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
+        #ifndef _WIN32
+            cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
+        #endif
         cmd_append(&cmd, "-o", (char*)build_here, (char*)source_here);
-        cmd_append(&cmd, "-lm", "-l:libraylib.a");
+        #ifdef _WIN32
+            cmd_append(&cmd, "./thirdparty/raylib/lib/raylib.lib", "-lopengl32", "-lgdi32", "-lwinmm", "-luuid");
+        #else
+            cmd_append(&cmd, "-lm", "-l:libraylib.a");
+        #endif
         if (!cmd_run(&cmd)) return 1;
 
         nob_log(NOB_INFO, "Built Demo %c", arg_demo[0]);
