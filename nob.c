@@ -1,4 +1,5 @@
 #define NOB_IMPLEMENTATION
+#define NOB_EXPERIMENTAL_DELETE_OLD
 #include "nob.h"
 
 #define BUILD ".build/"
@@ -6,15 +7,9 @@
 static Cmd cmd = {0};
 
 int main(int argc, char **argv) {
-    #ifndef _WIN32
-        NOB_GO_REBUILD_URSELF(argc, argv);
-    #endif
+    NOB_GO_REBUILD_URSELF(argc, argv);
 
-    #ifdef _WIN32
-        cmd_append(&cmd, "cmd", "/c", "cls");
-    #else
-        cmd_append(&cmd, "clear");
-    #endif
+    cmd_append(&cmd, "clear");
     assert(cmd_run(&cmd));
 
     assert(nob_mkdir_if_not_exists(BUILD));
@@ -42,25 +37,26 @@ int main(int argc, char **argv) {
     if (arg_demo != NULL && arg_demo[0] >= '0' && arg_demo[0] <= '9') {
         char build_here[64] = {0};
         snprintf((char*)build_here, 64, BUILD"demo-%c.exe", arg_demo[0]);
-        char* source_here[64] = {0};
+        char source_here[64] = {0};
         snprintf((char*)source_here, 64, SRC"demo-%c.c", arg_demo[0]);
 
-        #ifdef _WIN32
-            cmd_append(&cmd, "zig", "cc");
-        #else
+        if (0) {
             nob_cc(&cmd);
-        #endif
-        // cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=c99");
+        } else {
+            cmd_append(&cmd, "x86_64-w64-mingw32-gcc");
+        }
+        cmd_append(&cmd, "-Wall", "-Wextra", "-g", "-std=c99");
         // cmd_append(&cmd, "-fsanitize=address", "-fsanitize=leak", "-fsanitize=undefined", "-fsanitize=null");
-        #ifndef _WIN32
-            cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
-        #endif
+        cmd_append(&cmd, "-I./thirdparty/raylib/include/");
+        cmd_append(&cmd, "-L./thirdparty/raylib/lib/");
         cmd_append(&cmd, "-o", (char*)build_here, (char*)source_here);
-        #ifdef _WIN32
-            cmd_append(&cmd, "./thirdparty/raylib/lib/raylib.lib", "-lopengl32", "-lgdi32", "-lwinmm", "-luuid");
-        #else
-            cmd_append(&cmd, "-lm", "-l:libraylib.a");
-        #endif
+        if (0) {
+            cmd_append(&cmd, "-lm");
+            cmd_append(&cmd, "-l:libraylib.a");
+        } else {
+            cmd_append(&cmd, "./thirdparty/raylib-5.5_win64_mingw-w64/lib/libraylib.a");
+            cmd_append(&cmd, "-lopengl32", "-lgdi32", "-lwinmm");
+        }
         if (!cmd_run(&cmd)) return 1;
 
         nob_log(NOB_INFO, "Built Demo %c", arg_demo[0]);
@@ -68,7 +64,7 @@ int main(int argc, char **argv) {
 
         char* arg_run = shift(argv, argc);
         if (arg_run != NULL && arg_run[0] == 'r') {
-            cmd_append(&cmd, build_here);
+            cmd_append(&cmd, "wine", build_here);
             if (!cmd_run(&cmd)) return 1;
         }
     }
