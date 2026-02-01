@@ -238,6 +238,7 @@ int main(void) {
         // DrawFPS(0,0);
         EndDrawing();
     }
+    UnloadFont(roboto);
     CloseWindow();
     return 0;
 }

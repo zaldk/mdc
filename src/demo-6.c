@@ -104,7 +104,7 @@ int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN | FLAG_MSAA_4X_HINT);
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
-    init_fonts(true); // must be done AFTER InitWindow()
+    init_fonts(true, true); // must be done AFTER InitWindow()
 
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
@@ -184,8 +184,7 @@ int main(void) {
         // }}}
     }
 
-    UnloadFont(ICONS);
-    UnloadFont(ROBOTO);
+    free_fonts();
     CloseWindow();
     return 0;
 }

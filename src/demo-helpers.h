@@ -7,6 +7,7 @@
 #define RL1(C) (Color){(C).r,(C).g,(C).b,51}
 #define RL2(C,O) (Color){(C).r,(C).g,(C).b,(O)}
 
+#include "../assets/roboto.h"
 #define ROBOTO_PATH "assets/RobotoFlex/RobotoFlex-VariableFont_GRAD,XOPQ,XTRA,YOPQ,YTAS,YTDE,YTFI,YTLC,YTUC,opsz,slnt,wdth,wght.ttf"
 #define ICONS_PATH "assets/MaterialSymbols/MaterialSymbolsRounded.ttf"
 static Font ROBOTO, ICONS;
@@ -35,16 +36,26 @@ i32 find_icon(const char* icon_name) {
     return 0;
 }
 
-void init_fonts(bool load_icons) {
-    ROBOTO = LoadFontEx(ROBOTO_PATH, 72, NULL, 0);
+static bool __MDC_ROBOTO_STATIC = false;
+void init_fonts(bool load_static, bool load_icons) {
+    if (load_static) {
+        ROBOTO = LoadFont_Roboto();
+        __MDC_ROBOTO_STATIC = true;
+    } else {
+        ROBOTO = LoadFontEx(ROBOTO_PATH, 72, NULL, 0); // Requires the font file
+    }
     GenTextureMipmaps(&ROBOTO.texture);
     SetTextureFilter(ROBOTO.texture, TEXTURE_FILTER_BILINEAR);
 
     if (load_icons) {
-        ICONS = LoadFontEx(ICONS_PATH, 72, ICON_CODE, ICON_COUNT);
+        ICONS = LoadFontEx(ICONS_PATH, 72, ICON_CODE, ICON_COUNT); // Requires the font file
         GenTextureMipmaps(&ICONS.texture);
         SetTextureFilter(ICONS.texture, TEXTURE_FILTER_BILINEAR);
     }
+}
+void free_fonts(void) {
+    if (!__MDC_ROBOTO_STATIC) UnloadFont(ROBOTO);
+    UnloadFont(ICONS);
 }
 
 void DrawBoxRound(f32 x, f32 y, f32 w, f32 h, f32 tlr, f32 trr, f32 blr, f32 brr, MDColor bg) {

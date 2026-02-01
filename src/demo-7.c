@@ -176,7 +176,7 @@ int main(void) {
     InitWindow(W, H, "FLOAT");
     // SetTargetFPS(500);
 
-    init_fonts(true); // demo-helper; must be done AFTER InitWindow()
+    init_fonts(true, true); // demo-helper; must be done AFTER InitWindow()
     md_color_global_init(true);
 
     i32 mon = GetCurrentMonitor();
@@ -250,8 +250,7 @@ int main(void) {
         // }}}
     }
 
-    UnloadFont(ICONS);
-    UnloadFont(ROBOTO);
+    free_fonts();
     CloseWindow();
     return 0;
 }

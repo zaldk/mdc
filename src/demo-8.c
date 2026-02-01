@@ -63,7 +63,7 @@ int main(void) {
     SetTargetFPS(frame_rate);
 
     md_color_global_init(true);
-    init_fonts(false); // demo-helper; must be done AFTER InitWindow()
+    init_fonts(true, false); // demo-helper; must be done AFTER InitWindow()
 
     i32 mon = GetCurrentMonitor();
     Vec2 monitor_size = (Vec2){GetMonitorPhysicalWidth(mon), GetMonitorPhysicalHeight(mon)};
@@ -161,8 +161,7 @@ int main(void) {
         // }}}
     }
 
-    UnloadFont(ICONS);
-    UnloadFont(ROBOTO);
+    free_fonts();
     CloseWindow();
     return 0;
 }
