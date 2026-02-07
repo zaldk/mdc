@@ -135,6 +135,7 @@ int main(void) {
         DrawLayout1();
         DrawLayout2();
         DrawTextEx(roboto, "Press 'Space' To Change Theme", (Vector2){5, 580}, 20.0, 0.0, RL(COLOR.Scheme.OnBackground));
+        DrawFPS(0,0);
         EndDrawing();
     }
     UnloadFont(roboto);

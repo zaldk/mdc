@@ -41,6 +41,10 @@ typedef double      f64;
 #define MD_MAX_DEPTH 1024
 
 #define MD_PRINTF printf
+#ifdef _WIN32
+#define NO_LOGGING
+#define NO_ANSI
+#endif
 #ifdef NO_LOGGING
 #       define MD_LOG(...) (void)0
 #else
